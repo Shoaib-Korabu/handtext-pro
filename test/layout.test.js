@@ -1,7 +1,7 @@
 // Run with: npm test
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parse, layout, linesPerPage } = require('../js/layout.js');
+const { parse, layout, linesPerPage, inlineWords: inlineWords2 } = require('../js/layout.js');
 
 // Fake measurement: each character is half the font size wide (1 mm at the 2 mm test size).
 const measure = (text, size) => text.length * size * 0.5;
@@ -131,4 +131,45 @@ test('stripMarks removes ** and # but keeps lists and page breaks', () => {
     stripMarks('## Question 1\n### Importance:\n- **Data Protection:** keeps data safe\n1. one\n[pagebreak]\n#hashtag stays'),
     'Question 1\nImportance:\n- Data Protection: keeps data safe\n1. one\n[pagebreak]\n#hashtag stays',
   );
+});
+
+test('marks: {tag:..}, ==highlight== and ~~strike~~ give per-letter mark ids', () => {
+  const words = inlineWords2('{circle:two words} ==hi== ~~no~~ plain');
+  assert.equal(words[0].marks[0], words[1].marks[0]);
+  assert.match(words[0].marks[0], /^circle#/);
+  assert.match(words[2].marks[0], /^hl#/);
+  assert.match(words[3].marks[0], /^strike#/);
+  assert.equal(words[4].marks, null);
+});
+
+test('unknown tags and unmatched == stay as text', () => {
+  const words = inlineWords2('{nope:x} a == b');
+  assert.deepEqual(words.map((w) => w.text), ['{nope:x}', 'a', '==', 'b']);
+});
+
+test('$maths$ makes super/subscripts, symbols and fractions; prices are left alone', () => {
+  const [, e, , w] = inlineWords2('energy $mc^2$ water $H_2O$');
+  assert.equal(e.text, 'mc2');
+  assert.deepEqual(e.script, [0, 0, 1]);
+  assert.deepEqual(w.script, [0, -1, 0]);
+  assert.equal(inlineWords2('$\\frac{1}{2}$')[0].text, '1/2');
+  assert.equal(inlineWords2('$\\alpha$')[0].text, 'α');
+  assert.deepEqual(inlineWords2('costs $5 and $10').map((x) => x.text), ['costs', '$5', 'and', '$10']);
+});
+
+test('table rows become a hand-ruled table that fits the width', () => {
+  const blocks = parse('| A | B |\n|---|---|\n| one two three four five six | x |\nc | d');
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].type, 'table');
+  assert.equal(blocks[0].rows.length, 3);
+  const { pages } = layout(blocks, base);
+  const lines = pages.flat();
+  assert.ok(lines.every((l) => l.table));
+  const total = lines[0].table.cols.reduce((a, c) => a + c.w, 0);
+  assert.ok(total <= base.contentWidth + 1e-6, `table too wide: ${total}`);
+  assert.ok(lines.filter((l) => l.table.rowStart).length === 3);
+});
+
+test('writing on every 2nd line halves the lines per page', () => {
+  assert.equal(linesPerPage(297, { top: 25, bottom: 15 }, 8, 2), 16);
 });

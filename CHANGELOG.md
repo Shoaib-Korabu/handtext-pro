@@ -2,6 +2,28 @@
 
 All notable changes to HandText Pro are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.6.0] — 2026-11-03
+
+### Added
+- **Photo mode:** the page is photographed in a generated scene, with perspective, a curved sheet, shadows, light, vignette and grain. Scenes: wooden desk, spiral notebook, exercise book, and white table (phone photo). Works in the preview, PDF, images and Print check.
+- **Hand-drawn marks:**
+  - highlights in yellow, green, pink or blue (drawn under the writing)
+  - circle, box, underline, double underline, wavy underline, strike-through and "mark with X" (drawn in the pen's ink)
+  - a toolbar to mark the selected words, plus typed shortcuts: `==…==`, `~~…~~`, `{tag:…}`
+- **Maths in `$…$`:** superscripts and subscripts, `\frac`, `\sqrt`, Greek letters and common symbols. Prices like "$5 and $10" are left alone.
+- **Tables:** pipe rows and Markdown tables become hand-ruled tables with wrapped cells aligned to the ruled lines. Rows stay on one page.
+- Write on every 1st, 2nd or 3rd ruled line. Added a Wide ruled paper.
+- Transparent PNG (writing only) and Ultra 4K (400 DPI) exports.
+- Upload your own handwriting font (.ttf, .otf, .woff, .woff2), saved in the browser with IndexedDB.
+- Pasting from ChatGPT, Google Docs or web pages keeps headings, lists, bold and tables (undoable).
+- Keyboard shortcuts, listed with "?".
+- **Picker windows** for Handwriting, Ink, Paper & photo and Page size, each with an Apply button:
+  - handwriting: search, style filters, favourites, and samples written with your own text
+  - paper: thumbnails, and photo scenes previewed with your page
+
+### Changed
+- The Look section shows only the current handwriting, ink, paper and page size as buttons, which open the pickers. The Paper & page section is now Page layout & printing.
+
 ## [0.5.0] — 2026-11-03
 
 ### Added

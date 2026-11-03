@@ -5,7 +5,8 @@
   const { parse, layout, linesPerPage } = HT.Layout;
 
   const PRINT_K = 200 / 25.4;      // ~200 DPI for printing
-  const EXPORT_K = { standard: 150 / 25.4, high: 300 / 25.4 };
+  const EXPORT_K = { standard: 150 / 25.4, high: 300 / 25.4, ultra: 400 / 25.4 };
+  const PHOTO_MM = { w: 210, h: 280 }; // photo pages are 3:4, printed/exported at A4 width
   const STORAGE_KEY = 'handtext-pro:v1';
   // Fonts differ a lot in how big they look at the same size. Each is scaled so the
   // average of its x-height and cap height is 56% of the font size.
@@ -42,28 +43,31 @@
       }
     }
     // Ignore values that no longer exist (e.g. a removed font) or are out of range.
-    if (!HT.FONTS.some((f) => f.id === state.font)) state.font = HT.DEFAULTS.font;
+    if (!HT.FONTS.some((f) => f.id === state.font) && !/^user-/.test(state.font)) state.font = HT.DEFAULTS.font;
     if (!HT.PAPERS.some((p) => p.id === state.paper)) state.paper = HT.DEFAULTS.paper;
     if (!HT.PAGE_SIZES.some((p) => p.id === state.pageSize)) state.pageSize = HT.DEFAULTS.pageSize;
     if (state.ink !== 'custom' && !HT.INKS.some((i) => i.id === state.ink)) state.ink = HT.DEFAULTS.ink;
     if (!/^#[0-9a-f]{6}$/i.test(state.customInk)) state.customInk = HT.DEFAULTS.customInk;
     if (!['off', 'first', 'all'].includes(state.headerOn)) state.headerOn = HT.DEFAULTS.headerOn;
-    if (!['standard', 'high'].includes(state.quality)) state.quality = HT.DEFAULTS.quality;
+    if (!['standard', 'high', 'ultra'].includes(state.quality)) state.quality = HT.DEFAULTS.quality;
     if (!['digital', 'white', 'ink'].includes(state.output)) state.output = HT.DEFAULTS.output;
     const sd = HT.DEFAULTS.sim;
     const validIds = { printer: HT.PrintSim.PRINTERS, paper: HT.PrintSim.PAPERS, sheet: HT.PrintSim.SHEETS, scaling: HT.PrintSim.SCALINGS };
     for (const [key, list] of Object.entries(validIds)) if (!list.some((x) => x.id === state.sim[key])) state.sim[key] = sd[key];
     if (!['fit', 'actual', '200'].includes(state.sim.zoom)) state.sim.zoom = sd.zoom;
-    if (!['png', 'jpg'].includes(state.imageFormat)) state.imageFormat = HT.DEFAULTS.imageFormat;
+    if (!['png', 'jpg', 'png-clear'].includes(state.imageFormat)) state.imageFormat = HT.DEFAULTS.imageFormat;
+    if (!['print', 'photo'].includes(state.mode)) state.mode = HT.DEFAULTS.mode;
+    if (!HT.Photo.SCENES.some((x) => x.id === state.scene)) state.scene = HT.DEFAULTS.scene;
     const clamp = (v, a, b, d) => (Number.isFinite(v) ? Math.min(b, Math.max(a, v)) : d);
     state.fontSize = clamp(state.fontSize, 12, 36, HT.DEFAULTS.fontSize);
     state.lineSpacing = clamp(state.lineSpacing, 5, 14, HT.DEFAULTS.lineSpacing);
     state.wordSpacing = clamp(state.wordSpacing, 70, 180, HT.DEFAULTS.wordSpacing);
+    state.lineStep = [1, 2, 3].includes(state.lineStep) ? state.lineStep : 1;
     for (const k of ['movement', 'variation', 'inkflow', 'texture']) state[k] = clamp(state[k], 0, 100, HT.DEFAULTS[k]);
     for (const side of ['top', 'right', 'bottom', 'left']) state.margins[side] = clamp(state.margins[side], 0, 80, HT.DEFAULTS.margins[side]);
   }
 
-  const findFont = (id) => HT.FONTS.find((f) => f.id === id) || HT.FONTS[0];
+  const findFont = (id) => allFonts().find((f) => f.id === id) || HT.FONTS[0];
   const findPaper = (id) => HT.PAPERS.find((p) => p.id === id) || HT.PAPERS[0];
   const findSize = (id) => HT.PAGE_SIZES.find((p) => p.id === id) || HT.PAGE_SIZES[0];
   const inkColor = () => (state.ink === 'custom' ? state.customInk : (HT.INKS.find((i) => i.id === state.ink) || HT.INKS[0]).color);
@@ -129,12 +133,13 @@
   }
 
   async function computePlan() {
+    if (/^user-/.test(state.font)) await userFontsReady;
     const font = findFont(state.font);
     await loadFont(font);
     const info = fontInfo.get(font.id);
     const { size, margins } = geometry();
     const fontSizeMm = (state.fontSize * 25.4) / 72 * info.norm;
-    const lpp = linesPerPage(size.h, margins, state.lineSpacing);
+    const lpp = linesPerPage(size.h, margins, state.lineSpacing, state.lineStep);
     const result = layout(parse(state.text), {
       measure: measurerFor(info.family),
       fontSizeMm,
@@ -152,7 +157,8 @@
     return {
       ...result,
       size,
-      geo: { pageW: size.w, pageH: size.h, margins, lineSpacing: state.lineSpacing, fontSizeMm, linesPerPage: lpp, pageCount: result.pages.length },
+      outSize: state.mode === 'photo' ? PHOTO_MM : size, // what a finished page measures
+      geo: { pageW: size.w, pageH: size.h, margins, lineSpacing: state.lineSpacing, fontSizeMm, linesPerPage: lpp, pageCount: result.pages.length, lineStep: state.lineStep },
       font: { family: info.family, cursive: !!font.cursive },
       fontOk: info.ok,
       fontLabel: font.label,
@@ -166,10 +172,27 @@
     };
   }
 
-  const exportJob = (p, k) => ({
+  /** Draw finished page i (a flat page, or a photo of it in Photo mode) at k px/mm. */
+  function renderOutput(p, i, canvas, k, opts) {
+    if (p.settings.mode !== 'photo') {
+      HT.Render.renderPage(canvas, p.pages[i], i, p.settings, { ...p.geo, k }, p.font, { ...p.extrasFor(i), ...(opts || {}) });
+      return;
+    }
+    const W = Math.round(PHOTO_MM.w * k);
+    const page = document.createElement('canvas');
+    const pk = (W * 0.9) / p.size.w; // page drawn at about the size it appears in the photo
+    HT.Render.renderPage(page, p.pages[i], i, { ...p.settings, output: 'digital' }, { ...p.geo, k: pk }, p.font, p.extrasFor(i));
+    const photo = HT.Photo.compose(page, p.size, p.settings.scene, W, i + 1);
+    page.width = page.height = 1;
+    canvas.width = photo.width; canvas.height = photo.height;
+    canvas.getContext('2d').drawImage(photo, 0, 0);
+    photo.width = photo.height = 1;
+  }
+
+  const exportJob = (p, k, opts) => ({
     count: p.pages.length,
-    size: p.size,
-    renderTo: (i, canvas) => HT.Render.renderPage(canvas, p.pages[i], i, p.settings, { ...p.geo, k }, p.font, p.extrasFor(i)),
+    size: p.outSize,
+    renderTo: (i, canvas) => renderOutput(p, i, canvas, k, opts),
   });
 
   // ---------------- preview (lazy: only pages near the screen are drawn) ----------------
@@ -204,7 +227,7 @@
     const wrap = $('pages');
     const css = Math.min(760, wrap.clientWidth || Math.max(320, window.innerWidth - 40));
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    return Math.min(7, Math.max(2.5, (css * dpr) / p.size.w));
+    return Math.min(7, Math.max(2.5, (css * dpr) / p.outSize.w));
   }
 
   function ensurePageEls(count) {
@@ -230,7 +253,7 @@
       last.remove();
     }
     [...wrap.children].forEach((div, i) => {
-      div.style.aspectRatio = `${plan.size.w} / ${plan.size.h}`;
+      div.style.aspectRatio = `${plan.outSize.w} / ${plan.outSize.h}`;
       div.querySelector('.pno').textContent = `Page ${i + 1} of ${count}`;
       div.querySelector('canvas').setAttribute('aria-label', `Handwritten page ${i + 1} of ${count}`);
     });
@@ -243,7 +266,7 @@
     const canvas = div.querySelector('canvas');
     const sig = `${plan.key}|${previewK}|${i}|${JSON.stringify(plan.pages[i])}|${JSON.stringify(plan.extrasFor(i))}`;
     if (canvas.dataset.sig === sig) return;
-    HT.Render.renderPage(canvas, plan.pages[i], i, plan.settings, { ...plan.geo, k: previewK }, plan.font, plan.extrasFor(i));
+    renderOutput(plan, i, canvas, previewK);
     canvas.dataset.sig = sig;
     div.classList.remove('loading');
   }
@@ -285,59 +308,407 @@
   }
 
   // ---------------- controls ----------------
-  function buildFontPicker() {
-    const box = $('fonts');
-    HT.FONTS.forEach((font) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'font-opt';
-      b.dataset.font = font.id;
-      b.setAttribute('role', 'radio');
-      const sample = document.createElement('span');
-      sample.className = 'sample';
-      sample.textContent = 'Handwritten';
-      sample.style.fontFamily = `"${familyOf(font)}", cursive`;
-      const name = document.createElement('span');
-      name.className = 'fname';
-      name.textContent = `${font.label} \u00B7 ${font.style}`;
-      b.append(sample, name);
-      b.addEventListener('click', () => { state.font = font.id; syncUI(); scheduleRender(0); });
-      box.appendChild(b);
+  // ---------------- picker windows ----------------
+  const plainSample = () => {
+    const first = state.text.split('\n').map((l) => HT.Layout.stripMarks(l).replace(/[{}=~$|*_-]+/g, ' ').replace(/\b(hl|circle|box|u|uu|wavy|strike|cross)(-\w+)?:/g, '').trim()).find((l) => l.length > 3);
+    return (first || 'The quick brown fox jumps over the lazy dog').slice(0, 48);
+  };
+  const favs = () => new Set((state.favFonts || '').split(',').filter(Boolean));
+
+  function openFontPicker() {
+    allFonts().forEach(loadFont);
+    let query = '';
+    let group = 'all';
+    const sample = plainSample();
+    const styles = ['all', 'fav', ...new Set(allFonts().map((f) => f.style))];
+    HT.Modal.open({
+      title: 'Choose handwriting',
+      subtitle: `${allFonts().length} handwritings. Tap one to compare, then Apply. Star \u2605 your favourites.`,
+      items: allFonts().slice().sort((x, y) => (favs().has(y.id) ? 1 : 0) - (favs().has(x.id) ? 1 : 0)),
+      value: state.font,
+      gridClass: 'grid-fonts',
+      label: (f) => (f && f.label ? `Selected: ${f.label}` : ''),
+      filter: (f) => (group === 'all' || (group === 'fav' ? favs().has(f.id) : f.style === group))
+        && (!query || `${f.label} ${f.style}`.toLowerCase().includes(query)),
+      tools: (el, api) => {
+        const search = document.createElement('input');
+        search.type = 'search';
+        search.placeholder = 'Search handwriting\u2026';
+        search.className = 'modal-search';
+        search.addEventListener('input', () => { query = search.value.trim().toLowerCase(); api.refresh(); });
+        const chips = document.createElement('div');
+        chips.className = 'chips';
+        styles.forEach((st) => {
+          const c = document.createElement('button');
+          c.type = 'button';
+          c.className = 'chip';
+          c.textContent = st === 'all' ? 'All' : st === 'fav' ? '\u2605 Favourites' : st;
+          c.setAttribute('aria-pressed', String(st === group));
+          c.addEventListener('click', () => { group = st; chips.querySelectorAll('.chip').forEach((x) => x.setAttribute('aria-pressed', String(x === c))); api.refresh(); });
+          chips.appendChild(c);
+        });
+        el.append(search, chips);
+      },
+      render: (f, el) => {
+        const star = document.createElement('span');
+        star.className = 'star';
+        star.setAttribute('role', 'button');
+        star.setAttribute('aria-label', `Favourite ${f.label}`);
+        const paint = () => { const on = favs().has(f.id); star.textContent = on ? '\u2605' : '\u2606'; star.classList.toggle('on', on); };
+        paint();
+        star.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const set = favs();
+          if (set.has(f.id)) set.delete(f.id); else set.add(f.id);
+          state.favFonts = [...set].join(',');
+          storage.save();
+          paint();
+        });
+        const s = document.createElement('span');
+        s.className = 'pick-sample';
+        s.style.fontFamily = `"${familyOf(f)}", cursive`;
+        s.style.color = inkColor();
+        s.textContent = sample;
+        const n = document.createElement('span');
+        n.className = 'pick-name';
+        n.textContent = `${f.label} \u00B7 ${f.style}`;
+        el.append(star, s, n);
+      },
+      onApply: (id) => { state.font = id; syncUI(); scheduleRender(0); },
     });
-    // Load the chosen font first, then the rest for the picker samples.
-    loadFont(findFont(state.font)).then(() => HT.FONTS.forEach(loadFont));
   }
 
-  function buildInks() {
-    const box = $('inks');
-    const custom = box.querySelector('.custom');
-    HT.INKS.forEach((ink) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'swatch';
-      b.dataset.ink = ink.id;
-      b.title = ink.label;
-      b.style.background = ink.color;
-      b.setAttribute('role', 'radio');
-      b.setAttribute('aria-label', `${ink.label} ink`);
-      b.addEventListener('click', () => { state.ink = ink.id; syncUI(); scheduleRender(0); });
-      box.insertBefore(b, custom);
+  function openInkPicker() {
+    let custom = state.customInk;
+    const items = [...HT.INKS, { id: 'custom', label: 'Custom colour', color: custom }];
+    HT.Modal.open({
+      title: 'Choose ink',
+      subtitle: 'The colour of your pen. Tap one, then Apply.',
+      items,
+      value: state.ink,
+      gridClass: 'grid-swatches',
+      label: (i) => (i && i.label ? `Selected: ${i.label}` : ''),
+      render: (ink, el) => {
+        const dot = document.createElement('span');
+        dot.className = 'pick-dot';
+        dot.style.background = ink.id === 'custom' ? custom : ink.color;
+        const w = document.createElement('span');
+        w.className = 'pick-sample small';
+        w.style.fontFamily = `"${familyOf(findFont(state.font))}", cursive`;
+        w.style.color = ink.id === 'custom' ? custom : ink.color;
+        w.textContent = 'Handwritten notes';
+        const n = document.createElement('span');
+        n.className = 'pick-name';
+        n.textContent = ink.label;
+        el.append(dot, w, n);
+        if (ink.id === 'custom') {
+          const input = document.createElement('input');
+          input.type = 'color';
+          input.value = custom;
+          input.className = 'pick-color';
+          input.setAttribute('aria-label', 'Custom ink colour');
+          input.addEventListener('input', () => { custom = input.value; dot.style.background = custom; w.style.color = custom; });
+          input.addEventListener('click', (e) => e.stopPropagation());
+          el.appendChild(input);
+        }
+      },
+      onApply: (id) => { state.ink = id; if (id === 'custom') state.customInk = custom; syncUI(); scheduleRender(0); },
     });
-    custom.dataset.ink = 'custom';
-    custom.setAttribute('role', 'radio');
-    $('customInk').addEventListener('input', (e) => { state.ink = 'custom'; state.customInk = e.target.value; syncUI(); scheduleRender(); });
   }
 
-  function fillSelect(sel, items) {
-    items.forEach((it) => {
-      const o = document.createElement('option');
-      o.value = it.id;
-      o.textContent = it.label;
-      sel.appendChild(o);
+  /** Small picture of a paper style for the picker. */
+  function paperThumb(canvas, paperId, w, h) {
+    // Show the top-left corner of the sheet, zoomed in, so the ruling is clearly visible.
+    const p = findPaper(paperId);
+    const viewMm = 70;
+    const k = w / viewMm;
+    canvas.width = w; canvas.height = h;
+    HT.Render.drawPaper(canvas.getContext('2d'), { ...state, paper: paperId, output: 'digital', texture: Math.min(40, state.texture) },
+      { k, pageW: viewMm, pageH: (h / w) * viewMm, margins: { ...state.margins, left: Math.min(state.margins.left, 24), top: Math.min(state.margins.top, 16) }, lineSpacing: p.lineSpacing });
+  }
+
+  let sceneThumbCache = { key: '', urls: {} };
+  async function sceneThumbs(paperId) {
+    const key = `${paperId}|${state.font}|${state.ink}|${state.customInk}|${plan ? plan.key : ''}`;
+    if (sceneThumbCache.key === key) return sceneThumbCache.urls;
+    const p = plan || (await computePlan());
+    const page = document.createElement('canvas');
+    const k = 240 * 0.9 / p.size.w;
+    HT.Render.renderPage(page, p.pages[0], 0, { ...p.settings, paper: paperId, output: 'digital' }, { ...p.geo, k }, p.font, p.extrasFor(0));
+    const urls = {};
+    for (const sc of HT.Photo.SCENES) {
+      const c = HT.Photo.compose(page, p.size, sc.id, 240, 1);
+      urls[sc.id] = c.toDataURL('image/jpeg', 0.85);
+      c.width = c.height = 1;
+    }
+    sceneThumbCache = { key, urls };
+    return urls;
+  }
+
+  function openPaperPicker() {
+    const value = { mode: state.mode, paper: state.paper, scene: state.scene };
+    HT.Modal.open({
+      title: 'Paper & photo',
+      subtitle: 'Print gives a flat page for printing or sharing. Photo shows your page photographed in a real scene.',
+      label: () => `Selected: ${findPaper(value.paper).label.split(' \u2014 ')[0]}${value.mode === 'photo' ? ` \u00B7 photo: ${HT.Photo.SCENES.find((x) => x.id === value.scene).label}` : ''}`,
+      body: (el, api) => {
+        api.value = value;
+        const seg = document.createElement('div');
+        seg.className = 'segmented';
+        const build = () => {
+          el.querySelectorAll('.pick-section').forEach((n) => n.remove());
+          // paper grid
+          const sec = document.createElement('section');
+          sec.className = 'pick-section';
+          sec.innerHTML = '<h3>Paper</h3>';
+          const grid = document.createElement('div');
+          grid.className = 'pick-grid grid-thumbs';
+          HT.PAPERS.forEach((pp) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'pick';
+            b.setAttribute('role', 'radio');
+            b.setAttribute('aria-checked', String(pp.id === value.paper));
+            const c = document.createElement('canvas');
+            c.className = 'pick-thumb';
+            paperThumb(c, pp.id, 120, 170);
+            const n = document.createElement('span');
+            n.className = 'pick-name';
+            n.textContent = pp.label.split(' \u2014 ')[0];
+            b.append(c, n);
+            b.addEventListener('click', () => { value.paper = pp.id; api.value = value; grid.querySelectorAll('.pick').forEach((x) => x.setAttribute('aria-checked', String(x === b))); if (value.mode === 'photo') build(); });
+            b.addEventListener('dblclick', () => { value.paper = pp.id; api.apply(); });
+            grid.appendChild(b);
+          });
+          sec.appendChild(grid);
+          el.appendChild(sec);
+          if (value.mode !== 'photo') return;
+          // scene grid
+          const ss = document.createElement('section');
+          ss.className = 'pick-section';
+          ss.innerHTML = '<h3>Photo scene</h3>';
+          const sg = document.createElement('div');
+          sg.className = 'pick-grid grid-scenes';
+          HT.Photo.SCENES.forEach((sc) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'pick';
+            b.setAttribute('role', 'radio');
+            b.setAttribute('aria-checked', String(sc.id === value.scene));
+            const img = document.createElement('img');
+            img.className = 'pick-scene';
+            img.alt = '';
+            const n = document.createElement('span');
+            n.className = 'pick-name';
+            n.textContent = sc.label;
+            b.append(img, n);
+            b.addEventListener('click', () => { value.scene = sc.id; api.value = value; sg.querySelectorAll('.pick').forEach((x) => x.setAttribute('aria-checked', String(x === b))); });
+            b.addEventListener('dblclick', () => { value.scene = sc.id; api.apply(); });
+            sg.appendChild(b);
+          });
+          ss.appendChild(sg);
+          el.appendChild(ss);
+          sceneThumbs(value.paper).then((urls) => { sg.querySelectorAll('img').forEach((img, i) => { img.src = urls[HT.Photo.SCENES[i].id]; }); });
+        };
+        [['print', '\uD83D\uDCC4 Print (flat page)'], ['photo', '\uD83D\uDCF7 Photo (realistic scene)']].forEach(([m, label]) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = label;
+          b.setAttribute('aria-selected', String(value.mode === m));
+          b.addEventListener('click', () => { value.mode = m; api.value = value; seg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-selected', String(x === b))); build(); });
+          seg.appendChild(b);
+        });
+        el.appendChild(seg);
+        build();
+      },
+      onApply: (v) => {
+        if (v.paper !== state.paper) state.lineSpacing = findPaper(v.paper).lineSpacing; // each paper has its own ruling
+        state.paper = v.paper;
+        state.mode = v.mode;
+        state.scene = v.scene;
+        syncUI();
+        scheduleRender(0);
+      },
     });
   }
 
-  const RANGES = {
+  function openSizePicker() {
+    HT.Modal.open({
+      title: 'Page size',
+      subtitle: 'The size of the paper. Margins are adjusted to suit it.',
+      items: HT.PAGE_SIZES,
+      value: state.pageSize,
+      gridClass: 'grid-sizes',
+      label: (s) => (s && s.label ? `Selected: ${s.label}` : ''),
+      render: (sz, el) => {
+        const box = document.createElement('span');
+        box.className = 'pick-page';
+        box.style.width = `${sz.w / 3.2}px`;
+        box.style.height = `${sz.h / 3.2}px`;
+        const n = document.createElement('span');
+        n.className = 'pick-name';
+        n.textContent = sz.label;
+        el.append(box, n);
+      },
+      onApply: (id) => {
+        state.pageSize = id;
+        if (id === 'note') Object.assign(state.margins, { top: 14, right: 8, bottom: 8, left: 12 });
+        else if (id === 'a5') Object.assign(state.margins, { top: 20, right: 12, bottom: 12, left: 22 });
+        else Object.assign(state.margins, HT.DEFAULTS.margins);
+        syncUI();
+        scheduleRender(0);
+      },
+    });
+  }
+
+  function openShortcuts() {
+    HT.Modal.open({
+      title: 'Keyboard shortcuts',
+      body: (el) => {
+        const rows = [
+          ['Ctrl/\u2318 + Enter', 'Download PDF'], ['Ctrl/\u2318 + P', 'Print'], ['Ctrl/\u2318 + S', 'Save in this browser'],
+          ['Ctrl/\u2318 + O', 'Upload a file'], ['\u2190 / \u2192', 'Previous / next page (outside the text box)'],
+          ['Esc', 'Close a window'], ['?', 'Show these shortcuts'],
+        ];
+        const t = document.createElement('table');
+        t.className = 'shortcuts';
+        rows.forEach(([k, v]) => { const tr = t.insertRow(); tr.insertCell().innerHTML = `<kbd>${k}</kbd>`; tr.insertCell().textContent = v; });
+        el.appendChild(t);
+      },
+    });
+  }
+
+  /** Refresh the picker buttons so they show the current choice. */
+  function updatePickerButtons() {
+    const f = findFont(state.font);
+    const fv = $('pickFontValue');
+    fv.textContent = f.label;
+    fv.style.fontFamily = `"${familyOf(f)}", cursive`;
+    const inkLabel = state.ink === 'custom' ? 'Custom' : (HT.INKS.find((i) => i.id === state.ink) || HT.INKS[0]).label;
+    $('pickInkSwatch').style.background = inkColor();
+    $('pickInkValue').textContent = inkLabel;
+    paperThumb($('pickPaperThumb'), state.paper, 36, 48);
+    $('pickPaperValue').textContent = `${findPaper(state.paper).label.split(' \u2014 ')[0]}${state.mode === 'photo' ? ' \u00B7 \uD83D\uDCF7 Photo' : ''}`;
+    $('pickSizeValue').textContent = findSize(state.pageSize).label;
+  }
+
+  // ---------------- your own handwriting font ----------------
+  const customFonts = [];
+  const allFonts = () => [...HT.FONTS, ...customFonts];
+  const idb = {
+    open() {
+      return new Promise((resolve, reject) => {
+        if (!window.indexedDB) { reject(new Error('no IndexedDB')); return; }
+        const r = indexedDB.open('handtext-pro', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('fonts', { keyPath: 'id' });
+        r.onsuccess = () => resolve(r.result);
+        r.onerror = () => reject(r.error);
+      });
+    },
+    async all() {
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        const q = db.transaction('fonts').objectStore('fonts').getAll();
+        q.onsuccess = () => resolve(q.result || []);
+        q.onerror = () => reject(q.error);
+      });
+    },
+    async put(rec) {
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        const t = db.transaction('fonts', 'readwrite');
+        t.objectStore('fonts').put(rec);
+        t.oncomplete = () => resolve();
+        t.onerror = () => reject(t.error);
+      });
+    },
+  };
+
+  async function registerUserFont(rec) {
+    const font = { id: rec.id, label: rec.name, style: 'Your font', user: true };
+    const info = { family: familyOf(font), norm: 1, ok: false };
+    info.ready = new FontFace(info.family, rec.data).load().then((face) => {
+      document.fonts.add(face);
+      const ctx = document.createElement('canvas').getContext('2d');
+      ctx.font = `100px "${info.family}"`;
+      const visual = (ctx.measureText('x').actualBoundingBoxAscent + ctx.measureText('H').actualBoundingBoxAscent) / 200;
+      if (visual > 0.2) info.norm = Math.min(1.6, Math.max(0.65, TARGET_VISUAL_SIZE / visual));
+      info.ok = true;
+    });
+    fontInfo.set(font.id, info);
+    await info.ready;
+    if (!customFonts.some((f) => f.id === font.id)) customFonts.push(font);
+    return font;
+  }
+
+  const userFontsReady = (async () => {
+    try { for (const rec of await idb.all()) await registerUserFont(rec).catch(() => {}); } catch { /* no storage: fine */ }
+  })();
+
+  async function uploadFont(file) {
+    if (!/\.(ttf|otf|woff2?)$/i.test(file.name)) { setStatus('Choose a font file: .ttf, .otf, .woff or .woff2 (a photo of handwriting won\u2019t work).', true); return; }
+    if (file.size > 15 * 1024 * 1024) { setStatus('That font file is over 15 MB.', true); return; }
+    try {
+      const data = await file.arrayBuffer();
+      const rec = { id: `user-${Date.now().toString(36)}`, name: file.name.replace(/\.[^.]+$/, '').slice(0, 40), data };
+      const font = await registerUserFont(rec);
+      try { await idb.put(rec); } catch { /* saved for this session only */ }
+      state.font = font.id;
+      syncUI();
+      scheduleRender(0);
+      setStatus(`Added your font \u201C${font.label}\u201D. It's saved in this browser and listed under \u201CYour font\u201D.`);
+    } catch {
+      setStatus("That file couldn't be used as a font.", true);
+    }
+  }
+
+  // ---------------- marks toolbar & paste ----------------
+  function wrapSelection(kind) {
+    const ta = $('text');
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    const sel = ta.value.slice(s, e);
+    let before, after, placeholder;
+    if (kind === 'bold') { before = '**'; after = '**'; placeholder = 'bold words'; }
+    else if (kind === 'math') { before = '$'; after = '$'; placeholder = 'x^2 + y^2'; }
+    else if (kind === 'table') {
+      // A table goes on its own lines, after the line the cursor is on.
+      const nl = ta.value.indexOf('\n', e);
+      const at = nl === -1 ? ta.value.length : nl;
+      const lineHasText = ta.value.slice(ta.value.lastIndexOf('\n', at - 1) + 1, at).trim().length > 0;
+      const tpl = `${lineHasText ? '\n' : ''}| Heading 1 | Heading 2 |\n|---|---|\n| Cell | Cell |\n| Cell | Cell |${nl === -1 ? '\n' : ''}`;
+      ta.setRangeText(tpl, at, at, 'end');
+      afterEdit(ta);
+      return;
+    } else { before = `{${kind}:`; after = '}'; placeholder = 'words'; }
+    const inner = sel || placeholder;
+    ta.setRangeText(before + inner + after, s, e, 'end');
+    if (!sel) { ta.selectionStart = s + before.length; ta.selectionEnd = s + before.length + inner.length; }
+    afterEdit(ta);
+  }
+
+  function afterEdit(ta) {
+    ta.focus();
+    state.text = ta.value;
+    updateTextMeta();
+    scheduleRender(0);
+  }
+
+  function handlePaste(e) {
+    const html = e.clipboardData && e.clipboardData.getData('text/html');
+    if (!html || !/<(h[1-6]|li|strong|b|table|tr)\b/i.test(html)) return; // plain text: let the browser paste it
+    let md;
+    try { md = HT.Import.htmlToMarkup(html).text; } catch { return; }
+    if (!md.trim()) return;
+    e.preventDefault();
+    const ta = $('text');
+    undoText = ta.value;
+    ta.setRangeText(md, ta.selectionStart, ta.selectionEnd, 'end');
+    afterEdit(ta);
+    $('undoBtn').hidden = false;
+    setStatus('Pasted with headings, lists, bold and tables kept. Press Undo to undo.');
+  }
+
+    const RANGES = {
     fontSize:    (v) => `${v} pt`,
     wordSpacing: (v) => `${v}%`,
     lineSpacing: (v) => `${(+v).toFixed(1)} mm`,
@@ -367,13 +738,11 @@
     $('output').value = state.output;
     $('outputHelp').textContent = OUTPUT_HELP[state.output] || '';
     for (const key of SWITCHES) $(key).checked = !!state[key];
-    $('paper').value = state.paper;
-    $('pageSize').value = state.pageSize;
+    $('lineStep').value = String(state.lineStep);
     $('quality').value = state.quality;
     $('imageFormat').value = state.imageFormat;
     $('customInk').value = state.customInk;
-    document.querySelectorAll('.font-opt').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.font === state.font)));
-    document.querySelectorAll('#inks [data-ink]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.ink === state.ink)));
+    updatePickerButtons();
     document.querySelectorAll('[data-preset]').forEach((b) => {
       const p = HT.PRESETS[b.dataset.preset];
       b.setAttribute('aria-pressed', String(Object.keys(p).every((k) => state[k] === p[k])));
@@ -398,7 +767,7 @@
       ? (state.pageNumbers ? 'page numbers' : 'off')
       : `${h.name.trim() || 'details'}${state.headerOn === 'all' ? ' \u00B7 every page' : ''}${state.pageNumbers ? ' \u00B7 page no.' : ''}`;
     $('sumText').textContent = state.text.trim() ? `${state.text.trim().split(/\s+/).length.toLocaleString()} words` : 'empty';
-    $('sumDl').textContent = `${state.quality === 'high' ? '300' : '150'} DPI \u00B7 ${state.imageFormat.toUpperCase()}`;
+    $('sumDl').textContent = `${{ standard: '150 DPI', high: '300 DPI', ultra: '4K' }[state.quality]} \u00B7 ${{ jpg: 'JPG', png: 'PNG', 'png-clear': 'clear PNG' }[state.imageFormat]}`;
   }
 
   function bindControls() {
@@ -445,20 +814,15 @@
       });
     }
 
-    $('paper').addEventListener('change', (e) => {
-      state.paper = e.target.value;
-      state.lineSpacing = findPaper(state.paper).lineSpacing; // each paper has its own ruling
-      syncUI();
-      scheduleRender(0);
-    });
-    $('pageSize').addEventListener('change', (e) => {
-      state.pageSize = e.target.value;
-      if (state.pageSize === 'note') Object.assign(state.margins, { top: 14, right: 8, bottom: 8, left: 12 });
-      else if (state.pageSize === 'a5') Object.assign(state.margins, { top: 20, right: 12, bottom: 12, left: 22 });
-      else Object.assign(state.margins, HT.DEFAULTS.margins);
-      syncUI();
-      scheduleRender(0);
-    });
+    $('pickFont').addEventListener('click', openFontPicker);
+    $('pickInk').addEventListener('click', openInkPicker);
+    $('pickPaper').addEventListener('click', openPaperPicker);
+    $('pickSize').addEventListener('click', openSizePicker);
+    $('lineStep').addEventListener('change', (e) => { state.lineStep = +e.target.value; scheduleRender(0); });
+    document.querySelectorAll('[data-wrap]').forEach((b) => b.addEventListener('click', () => wrapSelection(b.dataset.wrap)));
+    $('text').addEventListener('paste', handlePaste);
+    $('fontUploadBtn').addEventListener('click', () => $('fontFile').click());
+    $('fontFile').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) uploadFont(f); });
     $('quality').addEventListener('change', (e) => { state.quality = e.target.value; storage.save(); updateSummaries(); });
     $('imageFormat').addEventListener('change', (e) => { state.imageFormat = e.target.value; storage.save(); updateSummaries(); });
 
@@ -504,9 +868,24 @@
     $('imgBtn').addEventListener('click', () => busy($('imgBtn'), downloadImages));
     $('printBtn').addEventListener('click', () => busy($('printBtn'), printPages));
     window.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'p') {
-        e.preventDefault();
-        busy($('printBtn'), printPages);
+      if (HT.Modal.isOpen()) return;
+      const mod = (e.ctrlKey || e.metaKey) && !e.altKey;
+      const key = e.key.toLowerCase();
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement && document.activeElement.tagName);
+      if (mod && !e.shiftKey && key === 'p') { e.preventDefault(); busy($('printBtn'), printPages); }
+      else if (mod && key === 'enter') { e.preventDefault(); busy($('pdfBtn'), downloadPdf); }
+      else if (mod && key === 's') { e.preventDefault(); storage.save(); setStatus('Saved in this browser.'); }
+      else if (mod && key === 'o') { e.preventDefault(); $('importFile').click(); }
+      else if (!typing && !mod && e.key === '?') { e.preventDefault(); openShortcuts(); }
+      else if (!typing && !mod && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+        if (simMode) { $(e.key === 'ArrowRight' ? 'simNext' : 'simPrev').click(); return; }
+        const pages = [...$('pages').children];
+        if (!pages.length) return;
+        const y = window.innerHeight * 0.3;
+        let idx = pages.findIndex((p) => p.getBoundingClientRect().bottom > y);
+        if (idx < 0) idx = pages.length - 1;
+        idx = Math.max(0, Math.min(pages.length - 1, idx + (e.key === 'ArrowRight' ? 1 : -1)));
+        pages[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     });
 
@@ -661,7 +1040,8 @@
   async function downloadImages() {
     const p = await freshPlan();
     const k = EXPORT_K[state.quality] || EXPORT_K.high;
-    const name = await HT.Export.images(exportJob(p, k), state.imageFormat, docName, (m) => setStatus(m));
+    const clear = state.imageFormat === 'png-clear' && state.mode !== 'photo';
+    const name = await HT.Export.images(exportJob(p, k, clear ? { transparent: true } : null), clear ? 'png' : state.imageFormat === 'png-clear' ? 'png' : state.imageFormat, docName, (m) => setStatus(m));
     setStatus(`Saved ${name}.`);
   }
 
@@ -753,8 +1133,8 @@
       return { canvas, mm, sheetHint: sheet };
     }
     const p = plan;
-    HT.Render.renderPage(canvas, p.pages[i], i, p.settings, { ...p.geo, k }, p.font, p.extrasFor(i));
-    return { canvas, mm: { w: p.size.w, h: p.size.h } };
+    renderOutput(p, i, canvas, k);
+    return { canvas, mm: { w: p.outSize.w, h: p.outSize.h } };
   }
 
   function simOptions() {
@@ -1003,10 +1383,9 @@
   function init() {
     $('version').textContent = `v${HT.VERSION.replace(/\.0$/, '')}`;
     restore();
-    fillSelect($('paper'), HT.PAPERS);
-    fillSelect($('pageSize'), HT.PAGE_SIZES);
-    buildFontPicker();
-    buildInks();
+    HT.Modal.init();
+    loadFont(findFont(state.font)).then(() => HT.FONTS.forEach(loadFont));
+    userFontsReady.then(() => { syncUI(); if (findFont(state.font).user) scheduleRender(0); });
     syncUI();
     bindControls();
     bindUpload();

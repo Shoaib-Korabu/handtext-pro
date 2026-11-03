@@ -5,7 +5,7 @@
   'use strict';
   const HT = (root.HT = root.HT || {});
 
-  HT.VERSION = '0.5.0';
+  HT.VERSION = '0.6.0';
 
   // `cursive: true` = joined-up script; per-letter jitter is reduced so joins stay connected.
   HT.FONTS = [
@@ -41,6 +41,7 @@
   HT.PAPERS = [
     { id: 'notebook', label: 'Notebook \u2014 ruled with margin', lineSpacing: 8,    bg: '#fffef9' },
     { id: 'college',  label: 'College ruled',                 lineSpacing: 7.1,  bg: '#fffefb' },
+    { id: 'wide',     label: 'Wide ruled',                    lineSpacing: 8.7,  bg: '#fffefb' },
     { id: 'legal',    label: 'Legal pad (yellow)',            lineSpacing: 8.7,  bg: '#fdf7c3' },
     { id: 'grid',     label: 'Grid (5 mm)',                   lineSpacing: 7.5,  bg: '#fdfdfb' },
     { id: 'dots',     label: 'Dot grid',                      lineSpacing: 7.5,  bg: '#fdfdfb' },
@@ -70,6 +71,10 @@
     ink: 'blue',
     customInk: '#1b3a9e',
     fontSize: 20,        // pt
+    lineStep: 1,         // write on every 1st, 2nd or 3rd ruled line
+    mode: 'print',       // 'print' (flat page) | 'photo' (page photographed in a scene)
+    scene: 'desk',       // Photo mode scene
+    favFonts: '',        // starred handwritings, comma-separated ids
     lineSpacing: 8,      // mm
     wordSpacing: 100,    // % of normal
     paper: 'notebook',

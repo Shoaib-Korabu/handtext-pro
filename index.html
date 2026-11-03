@@ -15,7 +15,7 @@
     <div class="brand">
       <span class="logo" aria-hidden="true">✍</span>
       <span class="name">HandText <b>Pro</b></span>
-      <span class="badge" id="version">v0.5</span>
+      <span class="badge" id="version">v0.6</span>
     </div>
     <p class="tagline">Upload or type → realistic handwriting → print-ready pages. Free and private: everything happens in your browser.</p>
   </header>
@@ -56,8 +56,25 @@
           <button type="button" id="stripBtn" class="chip" title="Delete the ** and # marks from the text">Remove ** and # marks</button>
           <button type="button" id="undoBtn" class="chip chip-undo" hidden>↶ Undo</button>
         </div>
+        <div class="formatbar" role="toolbar" aria-label="Mark selected words">
+          <span class="fb-label">Mark selected words:</span>
+          <button type="button" class="fb" data-wrap="hl" title="Yellow highlight"><span class="sw" style="background:#ffe14d"></span></button>
+          <button type="button" class="fb" data-wrap="hl-green" title="Green highlight"><span class="sw" style="background:#83e68f"></span></button>
+          <button type="button" class="fb" data-wrap="hl-pink" title="Pink highlight"><span class="sw" style="background:#ff94cc"></span></button>
+          <button type="button" class="fb" data-wrap="hl-blue" title="Blue highlight"><span class="sw" style="background:#86cdff"></span></button>
+          <button type="button" class="fb" data-wrap="circle" title="Circle">◯</button>
+          <button type="button" class="fb" data-wrap="box" title="Box">▢</button>
+          <button type="button" class="fb" data-wrap="u" title="Underline"><u>U</u></button>
+          <button type="button" class="fb" data-wrap="uu" title="Double underline"><span style="text-decoration:underline double">U</span></button>
+          <button type="button" class="fb" data-wrap="wavy" title="Wavy underline"><span style="text-decoration:underline wavy">U</span></button>
+          <button type="button" class="fb" data-wrap="strike" title="Strike through"><s>S</s></button>
+          <button type="button" class="fb" data-wrap="cross" title="Mark with X">✕</button>
+          <button type="button" class="fb" data-wrap="bold" title="Bold"><b>B</b></button>
+          <button type="button" class="fb" data-wrap="math" title="Maths: x^2, H_2O, \frac{a}{b}, \pi">∑</button>
+          <button type="button" class="fb" data-wrap="table" title="Insert a table">▦</button>
+        </div>
         <textarea id="text" rows="14" spellcheck="true" placeholder="Type or paste your notes here, or upload a file above…"></textarea>
-        <p class="help"><code># Heading</code> <code>## Subheading</code> <code>### Bold line</code> <code>- bullet</code> <code>1. numbered</code> <code>**bold**</code> <code>[pagebreak]</code></p>
+        <p class="help"><code># Heading</code> <code>- bullet</code> <code>1. numbered</code> <code>**bold**</code> <code>==highlight==</code> <code>{circle:word}</code> <code>$x^2$</code> <code>a | b</code> <code>[pagebreak]</code> · paste from ChatGPT or Docs keeps formatting</p>
         <p class="meta" id="textMeta"></p>
       </details>
 
@@ -83,23 +100,36 @@
       </details>
 
       <details class="card" open>
-        <summary><span class="sum-title">✍️ Handwriting</span><span class="sum-val" id="sumHand"></span></summary>
+        <summary><span class="sum-title">✍️ Look</span><span class="sum-val" id="sumHand"></span></summary>
+        <div class="pickers">
+          <button type="button" class="picker-btn" id="pickFont" aria-haspopup="dialog">
+            <span class="pb-label">Handwriting</span>
+            <span class="pb-value pb-font" id="pickFontValue"></span>
+          </button>
+          <button type="button" class="picker-btn" id="pickInk" aria-haspopup="dialog">
+            <span class="pb-label">Ink</span>
+            <span class="pb-value"><span class="pb-swatch" id="pickInkSwatch"></span><span id="pickInkValue"></span></span>
+          </button>
+          <button type="button" class="picker-btn" id="pickPaper" aria-haspopup="dialog">
+            <span class="pb-label">Paper &amp; photo</span>
+            <span class="pb-value"><canvas class="pb-thumb" id="pickPaperThumb" width="36" height="48"></canvas><span id="pickPaperValue"></span></span>
+          </button>
+          <button type="button" class="picker-btn" id="pickSize" aria-haspopup="dialog">
+            <span class="pb-label">Page size</span>
+            <span class="pb-value" id="pickSizeValue"></span>
+          </button>
+        </div>
         <label class="switch-row">
           <span class="switch-text"><b>Single pen</b><small>Everything the same size and thickness, like one person with one pen. Ignores bold and big headings.</small></span>
           <input type="checkbox" role="switch" class="switch" id="plainPen">
         </label>
-        <div class="fonts" id="fonts" role="radiogroup" aria-label="Handwriting style"></div>
         <div class="row2">
           <label class="field"><span class="lbl">Size <output id="fontSizeOut"></output></span>
             <input type="range" id="fontSize" min="12" max="36" step="1"></label>
           <label class="field"><span class="lbl">Word spacing <output id="wordSpacingOut"></output></span>
             <input type="range" id="wordSpacing" min="70" max="180" step="5"></label>
         </div>
-        <div class="field"><span class="lbl">Ink</span>
-          <div class="swatches" id="inks" role="radiogroup" aria-label="Ink colour">
-            <label class="swatch custom" title="Custom colour"><input type="color" id="customInk" aria-label="Custom ink colour"></label>
-          </div>
-        </div>
+        <input type="color" id="customInk" hidden>
       </details>
 
       <details class="card" open>
@@ -132,7 +162,7 @@
       </details>
 
       <details class="card" open>
-        <summary><span class="sum-title">📄 Paper &amp; page</span><span class="sum-val" id="sumPaper"></span></summary>
+        <summary><span class="sum-title">📏 Page layout &amp; printing</span><span class="sum-val" id="sumPaper"></span></summary>
         <label class="field"><span class="lbl">Printing on</span>
           <select id="output">
             <option value="digital">Nothing — I'll submit it digitally (full paper look)</option>
@@ -141,11 +171,15 @@
           </select>
           <small id="outputHelp"></small></label>
         <div class="row2">
-          <label class="field"><span class="lbl">Paper</span><select id="paper"></select></label>
-          <label class="field"><span class="lbl">Page size</span><select id="pageSize"></select></label>
+          <label class="field"><span class="lbl">Line spacing <output id="lineSpacingOut"></output></span>
+            <input type="range" id="lineSpacing" min="5" max="14" step="0.1"></label>
+          <label class="field"><span class="lbl">Write on</span>
+            <select id="lineStep">
+              <option value="1">Every line</option>
+              <option value="2">Every 2nd line</option>
+              <option value="3">Every 3rd line</option>
+            </select></label>
         </div>
-        <label class="field"><span class="lbl">Line spacing <output id="lineSpacingOut"></output></span>
-          <input type="range" id="lineSpacing" min="5" max="14" step="0.1"></label>
         <fieldset class="margins">
           <legend class="lbl">Margins (mm)</legend>
           <label>Top <input type="number" id="mTop" min="0" max="80" step="1" inputmode="numeric"></label>
@@ -156,22 +190,26 @@
       </details>
 
       <details class="card">
-        <summary><span class="sum-title">⬇️ Download options</span><span class="sum-val" id="sumDl"></span></summary>
+        <summary><span class="sum-title">⬇️ Download &amp; extras</span><span class="sum-val" id="sumDl"></span></summary>
         <div class="row2">
           <label class="field"><span class="lbl">Quality</span>
             <select id="quality">
               <option value="standard">Standard (150 DPI)</option>
               <option value="high">High (300 DPI)</option>
+              <option value="ultra">Ultra 4K (400 DPI)</option>
             </select></label>
           <label class="field"><span class="lbl">Image format</span>
             <select id="imageFormat">
               <option value="jpg">JPG (smaller)</option>
               <option value="png">PNG (lossless)</option>
+              <option value="png-clear">PNG, transparent (writing only)</option>
             </select></label>
         </div>
         <div class="actions">
           <button type="button" id="imgBtn">🖼 Download images</button>
+          <button type="button" id="fontUploadBtn">🔤 Use my own handwriting font</button>
         </div>
+        <input type="file" id="fontFile" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" hidden>
       </details>
     </aside>
 
@@ -240,6 +278,25 @@
     </section>
   </main>
 
+  <div class="modal-backdrop" id="modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header class="modal-head">
+        <div>
+          <h2 id="modalTitle"></h2>
+          <p id="modalSub" class="muted"></p>
+        </div>
+        <button type="button" class="modal-x" id="modalClose" aria-label="Close">✕</button>
+      </header>
+      <div class="modal-tools" id="modalTools"></div>
+      <div class="modal-body" id="modalBody"></div>
+      <footer class="modal-foot">
+        <span class="modal-choice" id="modalChoice"></span>
+        <button type="button" id="modalCancel">Cancel</button>
+        <button type="button" class="primary" id="modalApply">Apply</button>
+      </footer>
+    </div>
+  </div>
+
   <div id="printArea" class="print-area" aria-hidden="true"></div>
   <div id="dragOverlay" class="drag-overlay" hidden><div>Drop your file to turn it into handwriting</div></div>
 
@@ -253,6 +310,8 @@
   <script src="js/importer.js"></script>
   <script src="js/export.js"></script>
   <script src="js/printsim.js"></script>
+  <script src="js/photo.js"></script>
+  <script src="js/pickers.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

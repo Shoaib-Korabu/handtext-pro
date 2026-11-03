@@ -4,7 +4,7 @@ A free, open-source text-to-handwriting generator. **Upload your assignment** (P
 
 It's inspired by the feature set of tools like HandtextAI, but it's written from scratch with open-source fonts and libraries. Everything runs in your browser, so your text is never uploaded anywhere.
 
-**Current version: v0.5.0** · [Changelog](CHANGELOG.md)
+**Current version: v0.6.0** · [Changelog](CHANGELOG.md)
 
 🌐 **Live demo:** https://shoaib-korabu.github.io/handtext-pro/
 
@@ -23,6 +23,22 @@ It's inspired by the feature set of tools like HandtextAI, but it's written from
 - The handwritten PDF downloads automatically. You can switch this off to check the preview first.
 - **Undo** brings back your previous text.
 - Helpful messages for scanned PDFs, password-protected files, old `.doc` files and photos.
+
+**New in v0.6: the pro features**
+- **📷 Photo mode:** your page photographed in a realistic scene, with a slight camera angle, a curved sheet, a soft shadow, window light, a vignette and camera grain. There are four scenes:
+  - loose sheet on a wooden desk
+  - spiral notebook (rings and punched holes) on a dark desk
+  - open exercise book (gutter shadow and staples)
+  - sheet on a white table (phone photo, with the phone's shadow)
+- **Marks:** select words and tap a button for a highlight (yellow, green, pink or blue), circle, box, underline, double or wavy underline, strike-through, or "mark with X", all drawn by hand. You can also type them: `==highlight==`, `~~strike~~`, `{circle:words}`.
+- **Maths:** `$E = mc^2$`, `$H_2O$`, `$\frac{1}{2}$`, `$\pi r^2$`, `$a \le b$`, written in your handwriting with real superscripts and subscripts.
+- **Tables:** `a | b | c` rows, or Markdown tables, become hand-ruled tables. Cells wrap, and rows sit on the ruled lines.
+- **Write on every 2nd or 3rd line**, plus **wide-ruled** paper.
+- **Exports:** transparent PNG (writing only), and Ultra 4K (400 DPI).
+- **Your own handwriting font:** upload a .ttf, .otf, .woff or .woff2 file. It's saved in your browser.
+- **Paste from ChatGPT, Google Docs or websites:** headings, lists, bold and tables are kept.
+- **Keyboard shortcuts:** Ctrl/⌘+Enter to download the PDF, Ctrl/⌘+P to print, Ctrl/⌘+S to save, Ctrl/⌘+O to upload, ← → to change page, Esc to close a window, ? to show all shortcuts.
+- **Picker windows:** Handwriting, Ink, Paper & photo and Page size each open a window. You compare the options there (handwriting has search, style filters and ★ favourites), press **Apply**, and only your choice is shown afterwards.
 
 **🖨 Print check: see the printout before you pay for it** *(new in v0.5)*
 - A print-shop simulator that shows how each page will really come out of a printer.
@@ -126,6 +142,8 @@ js/importer.js      PDF / Word / text upload → markup (structure rebuild is un
 js/render.js        paper drawing, handwriting realism engine, header and page numbers
 js/export.js        PDF / image / ZIP / print export, one page at a time
 js/printsim.js      Print check: printer/paper/margin/scaling simulation (placement maths unit-tested)
+js/photo.js         Photo mode: generated desk scenes, page warping, light and shadow
+js/pickers.js       floating picker windows (choose, compare, Apply)
 js/app.js           app state, controls, preview, downloads
 fonts/              18 handwriting fonts (woff2)
 vendor/             jsPDF, JSZip, pdf.js, mammoth.js (pdf.js and mammoth load only when you upload)
@@ -140,7 +158,9 @@ test/               unit tests (node:test)
 | **v0.3** | ✅ Upload PDF/Word/text assignments → handwritten PDF in one go; bold text; name/roll/subject/date header; page numbers; mobile tabs; faster and lighter preview and export |
 | **v0.4** | ✅ Letter shape variation, tiredness over the page, green on/off switches, section summaries, step guide |
 | **v0.5** | ✅ Print check simulator (B&W/colour, printer margin, scaling, padding, toner, paper types, any PDF/image); "Printing on" output modes |
-| v0.6 | Fit into N pages; leave space for diagrams; Indian notebook styles (Page No./Date box); saved styles; print alignment test sheet |
+| **v0.6** | ✅ Photo mode (4 scenes), hand-drawn marks & highlights, maths, hand-ruled tables, every-Nth-line writing, transparent PNG, 4K, custom font upload, rich paste, shortcuts, picker windows with Apply |
+| v0.7 | Draw on the page (pen, arrows, shapes, stars, notes); images in notes; PowerPoint import; per-paragraph alignment |
+| v0.8 | Fit into N pages; leave space for diagrams; Indian notebook styles (Page No./Date box); saved styles |
 | v0.5 | Math notation (fractions, powers, symbols); images inside notes; PowerPoint import |
 | v1.0 | **Photo mode**: pages placed in realistic notebook/desk scenes; stable public release |
 | v2.0 | Upload your own handwriting font (TTF/OTF/WOFF) |
