@@ -6,6 +6,8 @@ It's inspired by the feature set of tools like HandtextAI, but it's written from
 
 **Current version: v0.1.0** · [Changelog](CHANGELOG.md)
 
+🌐 **Live demo:** https://shoaib-korabu.github.io/handtext-pro/
+
 ---
 
 ## Features in v0.1
@@ -54,9 +56,13 @@ Then open http://localhost:8000. You can also open `index.html` directly, though
 
 ## Put it online free (GitHub Pages)
 
-1. In the repo, go to **Settings → Pages**.
-2. Set **Source** to *Deploy from a branch*, choose **main**, folder **/ (root)**, then **Save**.
-3. About a minute later the site is live at `https://shoaib-korabu.github.io/handtext-pro/`.
+The live demo is served from the `gh-pages` branch. To update it after changing `main`:
+
+```bash
+git push origin main:gh-pages
+```
+
+(Or in **Settings → Pages**, choose *Deploy from a branch* → **main** / **(root)** to publish straight from `main`.)
 
 ## Tests
 
