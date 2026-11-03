@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HandText Pro</title>
+  <meta name="description" content="Free text-to-handwriting generator: type notes, choose a handwriting and paper, and download print-ready PDF or images.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%E2%9C%8D%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/app.css">
+  <style id="print-page-size"></style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">✍</span>
+      <span class="name">HandText <b>Pro</b></span>
+      <span class="badge" id="version">v0.1</span>
+    </div>
+    <p class="tagline">Typed text → realistic handwriting → print-ready pages. Free, private, in your browser.</p>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar" aria-label="Settings">
+
+      <details class="card" open>
+        <summary>Text</summary>
+        <div class="toolbar">
+          <button type="button" id="importBtn" class="chip">Import .txt / .md</button>
+          <button type="button" id="breakBtn" class="chip">Insert page break</button>
+          <button type="button" id="sampleBtn" class="chip">Sample</button>
+          <button type="button" id="clearBtn" class="chip">Clear</button>
+          <input type="file" id="importFile" accept=".txt,.md,.markdown,text/plain,text/markdown" hidden>
+        </div>
+        <textarea id="text" rows="14" spellcheck="true" placeholder="Type or paste your notes here…"></textarea>
+        <p class="help"><code># Heading</code> · <code>## Subheading</code> · <code>- bullet</code> · <code>1. numbered</code> · <code>[pagebreak]</code></p>
+        <p class="meta" id="textMeta"></p>
+      </details>
+
+      <details class="card" open>
+        <summary>Handwriting</summary>
+        <div class="fonts" id="fonts" role="radiogroup" aria-label="Handwriting style"></div>
+        <div class="row2">
+          <label class="field"><span class="lbl">Size <output id="fontSizeOut"></output></span>
+            <input type="range" id="fontSize" min="12" max="36" step="1"></label>
+          <label class="field"><span class="lbl">Word spacing <output id="wordSpacingOut"></output></span>
+            <input type="range" id="wordSpacing" min="70" max="180" step="5"></label>
+        </div>
+        <div class="field"><span class="lbl">Ink</span>
+          <div class="swatches" id="inks" role="radiogroup" aria-label="Ink colour">
+            <label class="swatch custom" title="Custom colour"><input type="color" id="customInk" aria-label="Custom ink colour"></label>
+          </div>
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary>Paper &amp; page</summary>
+        <div class="row2">
+          <label class="field"><span class="lbl">Paper</span><select id="paper"></select></label>
+          <label class="field"><span class="lbl">Page size</span><select id="pageSize"></select></label>
+        </div>
+        <label class="field"><span class="lbl">Line spacing <output id="lineSpacingOut"></output></span>
+          <input type="range" id="lineSpacing" min="5" max="14" step="0.1"></label>
+        <fieldset class="margins">
+          <legend class="lbl">Margins (mm)</legend>
+          <label>Top <input type="number" id="mTop" min="0" max="80" step="1"></label>
+          <label>Bottom <input type="number" id="mBottom" min="0" max="80" step="1"></label>
+          <label>Left <input type="number" id="mLeft" min="0" max="80" step="1"></label>
+          <label>Right <input type="number" id="mRight" min="0" max="80" step="1"></label>
+        </fieldset>
+      </details>
+
+      <details class="card" open>
+        <summary>Realism</summary>
+        <div class="presets" role="group" aria-label="Realism presets">
+          <button type="button" class="chip" data-preset="neat">Neat</button>
+          <button type="button" class="chip" data-preset="natural">Natural</button>
+          <button type="button" class="chip" data-preset="messy">Messy</button>
+        </div>
+        <label class="field"><span class="lbl">Natural movement <output id="movementOut"></output></span>
+          <input type="range" id="movement" min="0" max="100" step="1">
+          <small>Line starts, slope, baseline and word gaps vary like a real hand.</small></label>
+        <label class="field"><span class="lbl">Vary each letter <output id="variationOut"></output></span>
+          <input type="range" id="variation" min="0" max="100" step="1">
+          <small>Repeated letters never look exactly the same.</small></label>
+        <label class="field"><span class="lbl">Inkflow <output id="inkflowOut"></output></span>
+          <input type="range" id="inkflow" min="0" max="100" step="1">
+          <small>Pen pressure and ink density change along each line.</small></label>
+        <label class="field"><span class="lbl">Paper texture <output id="textureOut"></output></span>
+          <input type="range" id="texture" min="0" max="100" step="1">
+          <small>Grain and uneven light, like a scanned sheet.</small></label>
+      </details>
+
+      <details class="card" open>
+        <summary>Download</summary>
+        <div class="row2">
+          <label class="field"><span class="lbl">Quality</span>
+            <select id="quality">
+              <option value="standard">Standard (150 DPI)</option>
+              <option value="high">High (300 DPI)</option>
+            </select></label>
+          <label class="field"><span class="lbl">Image format</span>
+            <select id="imageFormat">
+              <option value="png">PNG</option>
+              <option value="jpg">JPG</option>
+            </select></label>
+        </div>
+        <div class="actions">
+          <button type="button" id="pdfBtn" class="primary">Download PDF</button>
+          <button type="button" id="imgBtn">Download images</button>
+          <button type="button" id="printBtn">Print</button>
+        </div>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+      </details>
+    </aside>
+
+    <section class="preview" aria-label="Preview">
+      <div class="preview-head">
+        <span class="lbl">Preview</span>
+        <span id="pageInfo" class="meta"></span>
+      </div>
+      <div id="pages" class="pages"></div>
+    </section>
+  </main>
+
+  <footer class="foot">HandText Pro · open source · your text never leaves your browser</footer>
+
+  <script src="vendor/jspdf.umd.min.js"></script>
+  <script src="vendor/jszip.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

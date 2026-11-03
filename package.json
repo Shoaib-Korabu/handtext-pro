@@ -1,0 +1,11 @@
+{
+  "name": "handtext-pro",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Free text-to-handwriting web app: type notes, pick a handwriting and paper, download print-ready PDF or images.",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "test": "node --test test/*.test.js"
+  },
+  "license": "MIT"
+}
