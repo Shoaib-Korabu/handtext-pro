@@ -5,7 +5,7 @@
   'use strict';
   const HT = (root.HT = root.HT || {});
 
-  HT.VERSION = '0.3.0';
+  HT.VERSION = '0.3.1';
 
   // `cursive: true` = joined-up script; per-letter jitter is reduced so joins stay connected.
   HT.FONTS = [
@@ -85,6 +85,7 @@
     headerOn: 'first',   // 'off' | 'first' | 'all'
     pageNumbers: false,
     autoDownload: true,  // download the PDF straight after an upload
+    plainPen: true,      // one pen: no bold strokes, no big or underlined headings
   };
 
   HT.PAGE_BREAK = '[pagebreak]';

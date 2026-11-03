@@ -136,6 +136,7 @@
       contentWidth: size.w - margins.left - margins.right,
       linesPerPage: linesPerPage(size.h, margins, state.lineSpacing),
       maxPages: HT.MAX_PAGES,
+      plain: state.plainPen,
     });
     const settings = { ...clone(state), inkColor: inkColor() };
     delete settings.text;
@@ -356,6 +357,7 @@
     $('headerOn').value = state.headerOn;
     $('pageNumbers').checked = state.pageNumbers;
     $('autoDownload').checked = state.autoDownload;
+    $('plainPen').checked = state.plainPen;
     $('paper').value = state.paper;
     $('pageSize').value = state.pageSize;
     $('quality').value = state.quality;
@@ -408,6 +410,7 @@
     $('headerOn').addEventListener('change', (e) => { state.headerOn = e.target.value; scheduleRender(0); });
     $('pageNumbers').addEventListener('change', (e) => { state.pageNumbers = e.target.checked; scheduleRender(0); });
     $('autoDownload').addEventListener('change', (e) => { state.autoDownload = e.target.checked; storage.save(); });
+    $('plainPen').addEventListener('change', (e) => { state.plainPen = e.target.checked; scheduleRender(0); });
 
     $('paper').addEventListener('change', (e) => {
       state.paper = e.target.value;
@@ -446,6 +449,12 @@
       scheduleRender(0);
     });
     $('sampleBtn').addEventListener('click', () => replaceText(HT.SAMPLE_TEXT, 'handwritten-notes'));
+    $('stripBtn').addEventListener('click', () => {
+      const cleaned = HT.Layout.stripMarks(state.text);
+      if (cleaned === state.text) { setStatus('There are no ** or # marks to remove.'); return; }
+      replaceText(cleaned, docName);
+      setStatus('Removed the ** and # marks. Press Undo to bring them back.');
+    });
     $('clearBtn').addEventListener('click', () => { replaceText('', 'handwritten-notes'); $('text').focus(); });
     $('undoBtn').addEventListener('click', () => {
       if (undoText === null) return;

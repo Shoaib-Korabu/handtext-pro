@@ -114,3 +114,21 @@ test('linesPerPage uses the space between top and bottom margins', () => {
   assert.equal(linesPerPage(297, { top: 25, bottom: 15 }, 8), 32);
   assert.equal(linesPerPage(50, { top: 25, bottom: 25 }, 8), 1);
 });
+
+test('single-pen mode writes headings and bold at normal size and weight', () => {
+  const blocks = parse('# Title\n### Sub\nSome **bold** text');
+  const { pages } = layout(blocks, { ...base, contentWidth: 400, plain: true });
+  for (const line of pages[0]) {
+    assert.equal(line.scale, 1);
+    assert.equal(line.heading, 0);
+    assert.ok(line.words.every((w) => w.bold === false && !w.text.includes('*')));
+  }
+});
+
+test('stripMarks removes ** and # but keeps lists and page breaks', () => {
+  const { stripMarks } = require('../js/layout.js');
+  assert.equal(
+    stripMarks('## Question 1\n### Importance:\n- **Data Protection:** keeps data safe\n1. one\n[pagebreak]\n#hashtag stays'),
+    'Question 1\nImportance:\n- Data Protection: keeps data safe\n1. one\n[pagebreak]\n#hashtag stays',
+  );
+});

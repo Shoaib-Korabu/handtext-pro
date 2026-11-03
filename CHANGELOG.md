@@ -2,6 +2,15 @@
 
 All notable changes to HandText Pro are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.3.1] — 2026-11-03
+
+### Added
+- **Single pen** mode, on by default. Headings are written at normal size, `**bold**` is ignored, and there are no underlines, so the page looks like one person wrote it with one pen.
+- A **Remove \*\* and # marks** button that strips formatting symbols from the text (undoable).
+
+### Changed
+- Pen-pressure shading now fades in and out smoothly and is lighter, so no word looks like it was written with a thicker pen.
+
 ## [0.3.0] — 2026-11-03
 
 ### Added

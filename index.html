@@ -15,7 +15,7 @@
     <div class="brand">
       <span class="logo" aria-hidden="true">✍</span>
       <span class="name">HandText <b>Pro</b></span>
-      <span class="badge" id="version">v0.3</span>
+      <span class="badge" id="version">v0.3.1</span>
     </div>
     <p class="tagline">Upload or type → realistic handwriting → print-ready pages. Free and private: everything happens in your browser.</p>
   </header>
@@ -44,6 +44,7 @@
           <button type="button" id="breakBtn" class="chip">Insert page break</button>
           <button type="button" id="sampleBtn" class="chip">Sample</button>
           <button type="button" id="clearBtn" class="chip">Clear</button>
+          <button type="button" id="stripBtn" class="chip" title="Delete the ** and # marks from the text">Remove ** and # marks</button>
           <button type="button" id="undoBtn" class="chip" hidden>Undo</button>
         </div>
         <textarea id="text" rows="14" spellcheck="true" placeholder="Type or paste your notes here, or upload a file above…"></textarea>
@@ -73,6 +74,7 @@
 
       <details class="card" open>
         <summary>Handwriting</summary>
+        <label class="check pen-toggle"><input type="checkbox" id="plainPen"> <span><b>Single pen</b> — write everything the same size and thickness, like one person with one pen (ignores bold and big headings)</span></label>
         <div class="fonts" id="fonts" role="radiogroup" aria-label="Handwriting style"></div>
         <div class="row2">
           <label class="field"><span class="lbl">Size <output id="fontSizeOut"></output></span>

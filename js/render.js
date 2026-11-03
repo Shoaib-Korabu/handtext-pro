@@ -213,10 +213,14 @@
         // Bold = pressing harder and going over the letter again.
         ctx.lineWidth = boldWidth;
         ctx.strokeText(ch, 0, 0);
-      } else if (fl > 0 && pressure > 0.7 && !pencil) {
-        // Heavier pressure leaves a slightly thicker stroke.
-        ctx.globalAlpha *= 0.35 * fl;
-        ctx.fillText(ch, 0.06 * k, 0.03 * k);
+      } else if (fl > 0 && !pencil) {
+        // Pressing a little harder leaves a slightly fuller stroke. It fades in and out
+        // smoothly along the line so it never looks like a different pen.
+        const extra = Math.max(0, (pressure - 0.55) / 0.45);
+        if (extra > 0.05) {
+          ctx.globalAlpha *= 0.15 * fl * extra;
+          ctx.fillText(ch, 0.035 * k, 0.02 * k);
+        }
       }
       ctx.restore();
     };

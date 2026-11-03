@@ -264,6 +264,8 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13.5px; cursor: pointer; }
 .check input { width: 17px; height: 17px; accent-color: var(--accent); flex: none; }
 .check-inline { margin-top: 22px; }
+.pen-toggle { margin: 0 0 12px; align-items: flex-start; line-height: 1.4; }
+.pen-toggle input { margin-top: 2px; }
 .muted { color: var(--muted); font-size: 12px; }
 button.link {
   border: 0; background: none; padding: 0; color: var(--accent);

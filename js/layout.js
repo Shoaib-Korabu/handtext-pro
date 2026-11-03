@@ -72,12 +72,14 @@
    * @param {Array} blocks         output of parse()
    * @param {Object} opt
    *   measure(text, sizeMm) -> width in mm
-   *   fontSizeMm, wordSpacing (%), contentWidth (mm), linesPerPage, maxPages
+   *   fontSizeMm, wordSpacing (%), contentWidth (mm), linesPerPage, maxPages,
+   *   plain (true = one pen: no bold, headings same size as text, no underline)
    * @returns {{pages: Array<Array<Line>>, truncated: boolean}}
    *   Line = { scale, indent, marker, heading, words:[{text,width,bold}], spaceWidth }
    */
   function layout(blocks, opt) {
     const { measure, fontSizeMm, contentWidth, linesPerPage } = opt;
+    const plain = !!opt.plain; // single pen: same size and weight for everything
     const maxPages = opt.maxPages || 50;
     const wsFactor = (opt.wordSpacing || 100) / 100;
     const pages = [[]];
@@ -156,10 +158,12 @@
       }
 
       const heading = b.type === 'heading' ? b.level : 0;
-      const scale = heading ? HEADING_SCALE[heading] : 1;
+      const scale = heading && !plain ? HEADING_SCALE[heading] : 1;
       const size = fontSizeMm * scale;
       const indent = b.type === 'list' ? fontSizeMm * LIST_INDENT_EM : 0;
-      const words = inlineWords(b.text, heading === 3);
+      const words = plain
+        ? inlineWords(b.text.replace(/\*\*/g, ''), false)
+        : inlineWords(b.text, heading === 3);
       const { lines, space } = wrap(words, size, contentWidth - indent);
 
       // Keep a heading together with at least one following line.
@@ -170,7 +174,7 @@
         scale,
         indent,
         marker: b.type === 'list' && i === 0 ? b.marker : null,
-        heading,
+        heading: plain ? 0 : heading,
         words: ws,
         spaceWidth: space,
       }));
@@ -181,11 +185,19 @@
     return { pages, truncated };
   }
 
+  /** Remove formatting marks (**bold**, # headings) but keep lists, numbering and page breaks. */
+  function stripMarks(text) {
+    return String(text || '')
+      .split(/\r?\n/)
+      .map((line) => line.replace(/^(\s*)#{1,6}\s+/, '$1').replace(/\*\*/g, ''))
+      .join('\n');
+  }
+
   function linesPerPage(pageH, margins, lineSpacing) {
     return Math.max(1, Math.floor((pageH - margins.top - margins.bottom) / lineSpacing));
   }
 
-  const api = { parse, layout, linesPerPage, inlineWords };
+  const api = { parse, layout, linesPerPage, inlineWords, stripMarks };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else (root.HT = root.HT || {}).Layout = api;
 })(typeof window !== 'undefined' ? window : globalThis);

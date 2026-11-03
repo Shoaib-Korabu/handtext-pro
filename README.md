@@ -4,7 +4,7 @@ A free, open-source text-to-handwriting generator. **Upload your assignment** (P
 
 It's inspired by the feature set of tools like HandtextAI, but it's written from scratch with open-source fonts and libraries. Everything runs in your browser, so your text is never uploaded anywhere.
 
-**Current version: v0.3.0** · [Changelog](CHANGELOG.md)
+**Current version: v0.3.1** · [Changelog](CHANGELOG.md)
 
 🌐 **Live demo:** https://shoaib-korabu.github.io/handtext-pro/
 
@@ -23,6 +23,10 @@ It's inspired by the feature set of tools like HandtextAI, but it's written from
 - The handwritten PDF downloads automatically. You can switch this off to check the preview first.
 - **Undo** brings back your previous text.
 - Helpful messages for scanned PDFs, password-protected files, old `.doc` files and photos.
+
+**Single pen** *(new in v0.3.1, on by default)*
+- Everything is written the same size and thickness, like one person with one pen. Bold marks and big headings from AI-formatted text are ignored.
+- **Remove \*\* and # marks** cleans the formatting symbols out of the text itself. Undo brings them back.
 
 **Assignment details** *(new in v0.3)*
 - Name, roll no., subject and date are written in handwriting in the top margin, on the first page or every page.

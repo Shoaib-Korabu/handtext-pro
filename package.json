@@ -1,6 +1,6 @@
 {
   "name": "handtext-pro",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Free text-to-handwriting web app: type notes, pick a handwriting and paper, download print-ready PDF or images.",
   "scripts": {
