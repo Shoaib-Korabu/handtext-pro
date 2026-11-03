@@ -2,6 +2,21 @@
 
 All notable changes to HandText Pro are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.4.0] — 2026-11-03
+
+### Added
+- **Letter shape variation** (on by default): each letter is warped along smooth curves. Rows shift and stretch, and columns rise and squash, so loops, bowls and tails change shape from one letter to the next. There are six cached variants per letter, built at 2× for crisp edges. The effect is gentler on cursive fonts so letters stay joined.
+- **Tiredness over the page**: further down each page, and slightly across the document, writing gets looser and more slanted, letters get a little taller, and the ink gets lighter.
+- Green on/off switches for Auto-download, Single pen, Page numbers, Letter shapes and Tiredness.
+- Section headers show the current setting (for example "Caveat · ballpoint blue · single pen").
+- A 1-2-3 step guide at the top, and icons on the Download and Print buttons.
+
+### Changed
+- Realism now sits above Paper & page. Download options are collapsed by default, because the main Download PDF button is always in the preview bar.
+
+### Fixed
+- On phones, the settings column was 1px wider than the screen and caused sideways scrolling.
+
 ## [0.3.1] — 2026-11-03
 
 ### Added

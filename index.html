@@ -15,7 +15,7 @@
     <div class="brand">
       <span class="logo" aria-hidden="true">✍</span>
       <span class="name">HandText <b>Pro</b></span>
-      <span class="badge" id="version">v0.3.1</span>
+      <span class="badge" id="version">v0.4</span>
     </div>
     <p class="tagline">Upload or type → realistic handwriting → print-ready pages. Free and private: everything happens in your browser.</p>
   </header>
@@ -28,6 +28,12 @@
   <main class="layout">
     <aside class="sidebar" id="sidebar" aria-label="Settings">
 
+      <ol class="steps" aria-label="How it works">
+        <li><span>1</span> Upload or type</li>
+        <li><span>2</span> Pick a style</li>
+        <li><span>3</span> Download</li>
+      </ol>
+
       <section class="card upload-card">
         <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-describedby="dropHint">
           <span class="drop-icon" aria-hidden="true">📄</span>
@@ -35,17 +41,20 @@
           <span class="drop-hint" id="dropHint">PDF, Word (.docx), .txt or .md · tap to choose or drag &amp; drop</span>
         </div>
         <input type="file" id="importFile" accept=".pdf,.docx,.txt,.md,.markdown,.html,.htm,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/html" hidden>
-        <label class="check"><input type="checkbox" id="autoDownload"> <span>Download the PDF automatically after upload</span></label>
+        <label class="switch-row">
+          <span class="switch-text"><b>Auto-download PDF</b><small>Get the handwritten PDF as soon as your file is read</small></span>
+          <input type="checkbox" role="switch" class="switch" id="autoDownload">
+        </label>
       </section>
 
       <details class="card" open>
-        <summary>Text</summary>
+        <summary><span class="sum-title">📝 Text</span><span class="sum-val" id="sumText"></span></summary>
         <div class="toolbar">
           <button type="button" id="breakBtn" class="chip">Insert page break</button>
           <button type="button" id="sampleBtn" class="chip">Sample</button>
           <button type="button" id="clearBtn" class="chip">Clear</button>
           <button type="button" id="stripBtn" class="chip" title="Delete the ** and # marks from the text">Remove ** and # marks</button>
-          <button type="button" id="undoBtn" class="chip" hidden>Undo</button>
+          <button type="button" id="undoBtn" class="chip chip-undo" hidden>↶ Undo</button>
         </div>
         <textarea id="text" rows="14" spellcheck="true" placeholder="Type or paste your notes here, or upload a file above…"></textarea>
         <p class="help"><code># Heading</code> <code>## Subheading</code> <code>### Bold line</code> <code>- bullet</code> <code>1. numbered</code> <code>**bold**</code> <code>[pagebreak]</code></p>
@@ -53,28 +62,32 @@
       </details>
 
       <details class="card">
-        <summary>Assignment details</summary>
+        <summary><span class="sum-title">🪪 Assignment details</span><span class="sum-val" id="sumDetails"></span></summary>
         <div class="row2">
           <label class="field"><span class="lbl">Name</span><input type="text" id="hName" autocomplete="name"></label>
           <label class="field"><span class="lbl">Roll no.</span><input type="text" id="hRoll"></label>
           <label class="field"><span class="lbl">Subject</span><input type="text" id="hSubject"></label>
           <label class="field"><span class="lbl">Date <button type="button" class="link" id="todayBtn">Today</button></span><input type="text" id="hDate" placeholder="dd/mm/yyyy"></label>
         </div>
-        <div class="row2">
-          <label class="field"><span class="lbl">Show details</span>
-            <select id="headerOn">
-              <option value="off">Don't show</option>
-              <option value="first">First page only</option>
-              <option value="all">Every page</option>
-            </select></label>
-          <label class="check check-inline"><input type="checkbox" id="pageNumbers"> <span>Page numbers</span></label>
-        </div>
-        <small class="muted">Written in your chosen handwriting in the top margin.</small>
+        <label class="field"><span class="lbl">Show details</span>
+          <select id="headerOn">
+            <option value="off">Don't show</option>
+            <option value="first">First page only</option>
+            <option value="all">Every page</option>
+          </select></label>
+        <label class="switch-row">
+          <span class="switch-text"><b>Page numbers</b><small>“Page 1, Page 2…” in the bottom corner</small></span>
+          <input type="checkbox" role="switch" class="switch" id="pageNumbers">
+        </label>
+        <small class="muted">Details are written in your handwriting in the top margin.</small>
       </details>
 
       <details class="card" open>
-        <summary>Handwriting</summary>
-        <label class="check pen-toggle"><input type="checkbox" id="plainPen"> <span><b>Single pen</b> — write everything the same size and thickness, like one person with one pen (ignores bold and big headings)</span></label>
+        <summary><span class="sum-title">✍️ Handwriting</span><span class="sum-val" id="sumHand"></span></summary>
+        <label class="switch-row">
+          <span class="switch-text"><b>Single pen</b><small>Everything the same size and thickness, like one person with one pen. Ignores bold and big headings.</small></span>
+          <input type="checkbox" role="switch" class="switch" id="plainPen">
+        </label>
         <div class="fonts" id="fonts" role="radiogroup" aria-label="Handwriting style"></div>
         <div class="row2">
           <label class="field"><span class="lbl">Size <output id="fontSizeOut"></output></span>
@@ -90,7 +103,36 @@
       </details>
 
       <details class="card" open>
-        <summary>Paper &amp; page</summary>
+        <summary><span class="sum-title">🎨 Realism</span><span class="sum-val" id="sumReal"></span></summary>
+        <div class="presets" role="group" aria-label="Realism presets">
+          <button type="button" class="chip" data-preset="neat">Neat</button>
+          <button type="button" class="chip" data-preset="natural">Natural</button>
+          <button type="button" class="chip" data-preset="messy">Messy</button>
+        </div>
+        <label class="switch-row">
+          <span class="switch-text"><b>Letter shape variation</b><small>Bends each letter's strokes a little differently, so no two letters are the same shape. Strength follows “Vary each letter”.</small></span>
+          <input type="checkbox" role="switch" class="switch" id="letterShape">
+        </label>
+        <label class="switch-row">
+          <span class="switch-text"><b>Tiredness over the page</b><small>Neat at the top, then a little faster, taller and more slanted towards the bottom — like a real hand getting tired.</small></span>
+          <input type="checkbox" role="switch" class="switch" id="fatigue">
+        </label>
+        <label class="field"><span class="lbl">Natural movement <output id="movementOut"></output></span>
+          <input type="range" id="movement" min="0" max="100" step="1">
+          <small>Line starts, slope, baseline and word gaps vary like a real hand.</small></label>
+        <label class="field"><span class="lbl">Vary each letter <output id="variationOut"></output></span>
+          <input type="range" id="variation" min="0" max="100" step="1">
+          <small>Each letter gets its own tilt, size and slant.</small></label>
+        <label class="field"><span class="lbl">Inkflow <output id="inkflowOut"></output></span>
+          <input type="range" id="inkflow" min="0" max="100" step="1">
+          <small>Pen pressure and ink density change along each line.</small></label>
+        <label class="field"><span class="lbl">Paper texture <output id="textureOut"></output></span>
+          <input type="range" id="texture" min="0" max="100" step="1">
+          <small>Grain and uneven light, like a scanned sheet.</small></label>
+      </details>
+
+      <details class="card" open>
+        <summary><span class="sum-title">📄 Paper &amp; page</span><span class="sum-val" id="sumPaper"></span></summary>
         <div class="row2">
           <label class="field"><span class="lbl">Paper</span><select id="paper"></select></label>
           <label class="field"><span class="lbl">Page size</span><select id="pageSize"></select></label>
@@ -106,29 +148,8 @@
         </fieldset>
       </details>
 
-      <details class="card" open>
-        <summary>Realism</summary>
-        <div class="presets" role="group" aria-label="Realism presets">
-          <button type="button" class="chip" data-preset="neat">Neat</button>
-          <button type="button" class="chip" data-preset="natural">Natural</button>
-          <button type="button" class="chip" data-preset="messy">Messy</button>
-        </div>
-        <label class="field"><span class="lbl">Natural movement <output id="movementOut"></output></span>
-          <input type="range" id="movement" min="0" max="100" step="1">
-          <small>Line starts, slope, baseline and word gaps vary like a real hand.</small></label>
-        <label class="field"><span class="lbl">Vary each letter <output id="variationOut"></output></span>
-          <input type="range" id="variation" min="0" max="100" step="1">
-          <small>Repeated letters never look exactly the same.</small></label>
-        <label class="field"><span class="lbl">Inkflow <output id="inkflowOut"></output></span>
-          <input type="range" id="inkflow" min="0" max="100" step="1">
-          <small>Pen pressure and ink density change along each line.</small></label>
-        <label class="field"><span class="lbl">Paper texture <output id="textureOut"></output></span>
-          <input type="range" id="texture" min="0" max="100" step="1">
-          <small>Grain and uneven light, like a scanned sheet.</small></label>
-      </details>
-
-      <details class="card" open>
-        <summary>Download</summary>
+      <details class="card">
+        <summary><span class="sum-title">⬇️ Download options</span><span class="sum-val" id="sumDl"></span></summary>
         <div class="row2">
           <label class="field"><span class="lbl">Quality</span>
             <select id="quality">
@@ -142,7 +163,7 @@
             </select></label>
         </div>
         <div class="actions">
-          <button type="button" id="imgBtn">Download images</button>
+          <button type="button" id="imgBtn">🖼 Download images</button>
         </div>
       </details>
     </aside>
@@ -154,8 +175,8 @@
           <span class="status" id="status" role="status" aria-live="polite"></span>
         </div>
         <div class="actions">
-          <button type="button" id="pdfBtn" class="primary">Download PDF</button>
-          <button type="button" id="printBtn">Print</button>
+          <button type="button" id="pdfBtn" class="primary">⬇ Download PDF</button>
+          <button type="button" id="printBtn">🖨 Print</button>
         </div>
       </div>
       <div id="pages" class="pages"></div>

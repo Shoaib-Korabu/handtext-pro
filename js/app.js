@@ -129,12 +129,13 @@
     const info = fontInfo.get(font.id);
     const { size, margins } = geometry();
     const fontSizeMm = (state.fontSize * 25.4) / 72 * info.norm;
+    const lpp = linesPerPage(size.h, margins, state.lineSpacing);
     const result = layout(parse(state.text), {
       measure: measurerFor(info.family),
       fontSizeMm,
       wordSpacing: state.wordSpacing,
       contentWidth: size.w - margins.left - margins.right,
-      linesPerPage: linesPerPage(size.h, margins, state.lineSpacing),
+      linesPerPage: lpp,
       maxPages: HT.MAX_PAGES,
       plain: state.plainPen,
     });
@@ -146,7 +147,7 @@
     return {
       ...result,
       size,
-      geo: { pageW: size.w, pageH: size.h, margins, lineSpacing: state.lineSpacing, fontSizeMm },
+      geo: { pageW: size.w, pageH: size.h, margins, lineSpacing: state.lineSpacing, fontSizeMm, linesPerPage: lpp, pageCount: result.pages.length },
       font: { family: info.family, cursive: !!font.cursive },
       fontOk: info.ok,
       fontLabel: font.label,
@@ -156,7 +157,7 @@
         pageNumber: pageNumbers,
       }),
       // Everything except a page's own lines that affects how a page looks.
-      key: JSON.stringify([settings, size, margins, fontSizeMm, info.family]),
+      key: JSON.stringify([settings, size, margins, fontSizeMm, info.family, lpp, result.pages.length]),
     };
   }
 
@@ -274,7 +275,7 @@
   let timer = null;
   function scheduleRender(delay = 140) {
     clearTimeout(timer);
-    timer = setTimeout(() => { renderPreview(); storage.save(); }, delay);
+    timer = setTimeout(() => { renderPreview(); storage.save(); updateSummaries(); }, delay);
   }
 
   // ---------------- controls ----------------
@@ -341,6 +342,8 @@
   };
   const MARGIN_INPUTS = { mTop: 'top', mBottom: 'bottom', mLeft: 'left', mRight: 'right' };
   const HEADER_INPUTS = { hName: 'name', hRoll: 'roll', hSubject: 'subject', hDate: 'date' };
+  // On/off switches — each id matches a boolean in state.
+  const SWITCHES = ['autoDownload', 'plainPen', 'pageNumbers', 'letterShape', 'fatigue'];
 
   function syncUI() {
     if ($('text').value !== state.text) $('text').value = state.text;
@@ -355,9 +358,7 @@
       if ($(id).value !== state.header[key]) $(id).value = state.header[key];
     }
     $('headerOn').value = state.headerOn;
-    $('pageNumbers').checked = state.pageNumbers;
-    $('autoDownload').checked = state.autoDownload;
-    $('plainPen').checked = state.plainPen;
+    for (const key of SWITCHES) $(key).checked = !!state[key];
     $('paper').value = state.paper;
     $('pageSize').value = state.pageSize;
     $('quality').value = state.quality;
@@ -371,6 +372,24 @@
     });
     $('undoBtn').hidden = undoText === null;
     updateTextMeta();
+    updateSummaries();
+  }
+
+  /** Short "current setting" text shown on each collapsed section header. */
+  function updateSummaries() {
+    const ink = state.ink === 'custom' ? 'custom ink' : (HT.INKS.find((i) => i.id === state.ink) || HT.INKS[0]).label.toLowerCase();
+    $('sumHand').textContent = `${findFont(state.font).label} \u00B7 ${ink}${state.plainPen ? ' \u00B7 single pen' : ''}`;
+    $('sumPaper').textContent = `${findPaper(state.paper).label.split(' \u2014 ')[0]} \u00B7 ${findSize(state.pageSize).label.split(' (')[0]}`;
+    const preset = Object.keys(HT.PRESETS).find((n) => Object.keys(HT.PRESETS[n]).every((k) => state[k] === HT.PRESETS[n][k]));
+    const extras = [state.letterShape && 'shapes', state.fatigue && 'tiredness'].filter(Boolean);
+    $('sumReal').textContent = [preset ? preset[0].toUpperCase() + preset.slice(1) : 'Custom', ...extras].join(' \u00B7 ');
+    const h = state.header;
+    const filled = [h.name, h.roll, h.subject, h.date].filter((v) => v && v.trim()).length;
+    $('sumDetails').textContent = state.headerOn === 'off' || !filled
+      ? (state.pageNumbers ? 'page numbers' : 'off')
+      : `${h.name.trim() || 'details'}${state.headerOn === 'all' ? ' \u00B7 every page' : ''}${state.pageNumbers ? ' \u00B7 page no.' : ''}`;
+    $('sumText').textContent = state.text.trim() ? `${state.text.trim().split(/\s+/).length.toLocaleString()} words` : 'empty';
+    $('sumDl').textContent = `${state.quality === 'high' ? '300' : '150'} DPI \u00B7 ${state.imageFormat.toUpperCase()}`;
   }
 
   function bindControls() {
@@ -408,9 +427,14 @@
       scheduleRender(0);
     });
     $('headerOn').addEventListener('change', (e) => { state.headerOn = e.target.value; scheduleRender(0); });
-    $('pageNumbers').addEventListener('change', (e) => { state.pageNumbers = e.target.checked; scheduleRender(0); });
-    $('autoDownload').addEventListener('change', (e) => { state.autoDownload = e.target.checked; storage.save(); });
-    $('plainPen').addEventListener('change', (e) => { state.plainPen = e.target.checked; scheduleRender(0); });
+    for (const key of SWITCHES) {
+      $(key).addEventListener('change', (e) => {
+        state[key] = e.target.checked;
+        updateSummaries();
+        if (key === 'autoDownload') storage.save();
+        else scheduleRender(0);
+      });
+    }
 
     $('paper').addEventListener('change', (e) => {
       state.paper = e.target.value;
@@ -426,8 +450,8 @@
       syncUI();
       scheduleRender(0);
     });
-    $('quality').addEventListener('change', (e) => { state.quality = e.target.value; storage.save(); });
-    $('imageFormat').addEventListener('change', (e) => { state.imageFormat = e.target.value; storage.save(); });
+    $('quality').addEventListener('change', (e) => { state.quality = e.target.value; storage.save(); updateSummaries(); });
+    $('imageFormat').addEventListener('change', (e) => { state.imageFormat = e.target.value; storage.save(); updateSummaries(); });
 
     document.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => {
       Object.assign(state, HT.PRESETS[b.dataset.preset]);

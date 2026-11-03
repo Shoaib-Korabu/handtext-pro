@@ -4,7 +4,7 @@ A free, open-source text-to-handwriting generator. **Upload your assignment** (P
 
 It's inspired by the feature set of tools like HandtextAI, but it's written from scratch with open-source fonts and libraries. Everything runs in your browser, so your text is never uploaded anywhere.
 
-**Current version: v0.3.1** · [Changelog](CHANGELOG.md)
+**Current version: v0.4.0** · [Changelog](CHANGELOG.md)
 
 🌐 **Live demo:** https://shoaib-korabu.github.io/handtext-pro/
 
@@ -23,6 +23,12 @@ It's inspired by the feature set of tools like HandtextAI, but it's written from
 - The handwritten PDF downloads automatically. You can switch this off to check the preview first.
 - **Undo** brings back your previous text.
 - Helpful messages for scanned PDFs, password-protected files, old `.doc` files and photos.
+
+**More human handwriting** *(new in v0.4)*
+- **Letter shape variation** (switch, on by default): each letter's strokes are gently bent, so repeated letters really differ in shape: rounder or flatter loops, longer or shorter tails. Its strength follows the *Vary each letter* slider.
+- **Tiredness over the page** (switch): neat at the top, then a little faster, taller, looser and more slanted towards the bottom, with slightly lighter ink.
+- Every on/off option is now a switch that turns **green** when on.
+- Each section shows its current setting on its header, there's a 1-2-3 step guide, and the layout fits phones without sideways scrolling.
 
 **Single pen** *(new in v0.3.1, on by default)*
 - Everything is written the same size and thickness, like one person with one pen. Bold marks and big headings from AI-formatted text are ignored.
@@ -114,7 +120,8 @@ test/               unit tests (node:test)
 |---|---|
 | **v0.1** | ✅ Core generator: 18 fonts, 7 papers, 4 page sizes, realism engine, PDF/PNG/JPG/ZIP, print |
 | **v0.3** | ✅ Upload PDF/Word/text assignments → handwritten PDF in one go; bold text; name/roll/subject/date header; page numbers; mobile tabs; faster and lighter preview and export |
-| v0.4 | Tables drawn as hand-ruled grids; landscape pages; more page sizes |
+| **v0.4** | ✅ Letter shape variation, tiredness over the page, green on/off switches, section summaries, step guide |
+| v0.4.x | Fit into N pages; leave space for diagrams; Indian notebook styles (Page No./Date box); saved styles |
 | v0.5 | Math notation (fractions, powers, symbols); images inside notes; PowerPoint import |
 | v1.0 | **Photo mode**: pages placed in realistic notebook/desk scenes; stable public release |
 | v2.0 | Upload your own handwriting font (TTF/OTF/WOFF) |

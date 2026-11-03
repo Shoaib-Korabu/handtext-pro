@@ -163,6 +163,95 @@
     return v;
   }
 
+  // ---------- letter shape variation ----------
+  // Each letter is drawn once into a small canvas and then gently warped: rows are
+  // shifted and stretched, columns are raised and squashed, all along smooth curves.
+  // That bends loops, tails and bowls so the same letter really changes shape.
+  // A handful of variants per letter are cached and picked at random.
+  const SHAPE_VARIANTS = 6;
+  const spriteCache = new Map();
+  let scratch = null;
+
+  function hashStr(s) {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0;
+    return h;
+  }
+
+  function glyphSprite(ch, fontCss, px, bold, boldWidth, rgb, variant, amount) {
+    const key = `${fontCss}|${ch}|${bold ? 1 : 0}|${rgb}|${variant}|${amount.toFixed(2)}`;
+    let spr = spriteCache.get(key);
+    if (spr !== undefined) return spr;
+    if (!scratch) scratch = document.createElement('canvas').getContext('2d');
+    // Small letters are built at 2x and scaled down, which keeps the warped strokes crisp.
+    const ss = px < 90 ? 2 : 1;
+    const fontSS = ss === 1 ? fontCss : fontCss.replace(/^[\d.]+px/, `${px * ss}px`);
+    px *= ss;
+    boldWidth *= ss;
+    scratch.font = fontSS;
+    const m = scratch.measureText(ch);
+    const left = Math.ceil(m.actualBoundingBoxLeft || 0);
+    const right = Math.ceil(m.actualBoundingBoxRight || 0);
+    const asc = Math.ceil(m.actualBoundingBoxAscent || 0);
+    const desc = Math.ceil(m.actualBoundingBoxDescent || 0);
+    if (left + right <= 0 || asc + desc <= 0) { spriteCache.set(key, null); return null; }
+    const pad = Math.ceil(px * 0.14 + boldWidth + 2);
+    const w = left + right + pad * 2;
+    const h = asc + desc + pad * 2;
+
+    const src = document.createElement('canvas');
+    src.width = w; src.height = h;
+    const s = src.getContext('2d');
+    s.font = fontSS;
+    s.fillStyle = rgb;
+    s.strokeStyle = rgb;
+    s.lineJoin = 'round';
+    s.textBaseline = 'alphabetic';
+    s.fillText(ch, pad + left, pad + asc);
+    if (bold) { s.lineWidth = boldWidth; s.strokeText(ch, pad + left, pad + asc); }
+
+    const r = mulberry32(seedOf(hashStr(ch), variant, 7919));
+    const amp = amount * px * 0.05;
+    // pass 1: each row slides sideways and gets a little wider or narrower
+    const mid = h / 2;
+    const tmp = document.createElement('canvas');
+    tmp.width = w; tmp.height = h;
+    const t = tmp.getContext('2d');
+    const f1 = range(r, 0.6, 1.4), p1 = r() * 6.28, shear = range(r, -1, 1);
+    const f3 = range(r, 0.5, 1.2), p3 = r() * 6.28, bulge = amount * 0.09;
+    for (let y = 0; y < h; y++) {
+      const v = y / h;
+      const dx = amp * (Math.sin(6.283 * v * f1 + p1) * 0.7 + shear * (v - 0.5) * 0.8);
+      const sx = 1 + bulge * Math.sin(6.283 * v * f3 + p3);
+      t.drawImage(src, 0, y, w, 1, w / 2 - (w / 2) * sx + dx, y, w * sx, 1);
+    }
+    // pass 2: each column rises or sinks and gets a little taller or shorter (around the baseline)
+    const out = document.createElement('canvas');
+    out.width = w; out.height = h;
+    const o = out.getContext('2d');
+    const f2 = range(r, 0.5, 1.3), p2 = r() * 6.28;
+    const f4 = range(r, 0.4, 1.0), p4 = r() * 6.28, stretch = amount * 0.08;
+    const base = pad + asc;
+    for (let x = 0; x < w; x++) {
+      const u = x / w;
+      const dy = amp * 0.75 * Math.sin(6.283 * u * f2 + p2);
+      const sy = 1 + stretch * Math.sin(6.283 * u * f4 + p4);
+      o.drawImage(tmp, x, 0, 1, h, x, base - base * sy + dy, 1, h * sy);
+    }
+    // Resampling softens edges; firm the ink back up so warped letters match normal ones.
+    const img = o.getImageData(0, 0, w, h);
+    const d = img.data;
+    for (let i = 3; i < d.length; i += 4) {
+      const a = d[i];
+      if (a) d[i] = Math.min(255, Math.round(255 * Math.pow(a / 255, 0.7)));
+    }
+    o.putImageData(img, 0, 0);
+    spr = { canvas: out, ox: (pad + left) / ss, oy: (pad + asc) / ss, w: w / ss, h: h / ss };
+    if (spriteCache.size > 5000) spriteCache.clear();
+    spriteCache.set(key, spr);
+    return spr;
+  }
+
   function hexToRgb(hex) {
     const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
     const n = m ? parseInt(m[1], 16) : 0x1b3a9e;
@@ -176,7 +265,15 @@
    * Returns the x (mm) where the line ended.
    */
   function drawLine(line, o) {
-    const { ctx, k, sizeMm, mv, vr, fl, pencil } = o;
+    const { ctx, k, sizeMm, fl, pencil } = o;
+    // Tiredness: further down the page the hand moves faster and gets looser —
+    // bigger wobble, more lean, taller letters and slightly lighter ink.
+    const tired = o.fatigue || 0;
+    const mv = Math.min(1.7, o.mv * (1 + 0.7 * tired) + 0.35 * tired);
+    const vr = o.vr * (1 + 0.8 * tired) + 0.3 * tired * (o.font.cursive ? 0.35 : 1);
+    const lean = -0.09 * tired;
+    const tall = 1 + 0.08 * tired;
+    const shapeAmt = Math.round((o.shape || 0) * (1 + 0.5 * tired) * 20) / 20 * (o.font.cursive ? 0.45 : 1);
     const rand = mulberry32(seedOf(...o.seed, 17));
     const px = sizeMm * k;
     const fontCss = `${px}px "${o.font.family}", "Comic Sans MS", cursive`;
@@ -202,12 +299,27 @@
       const dy = range(rnd, -0.22, 0.22) * vr;
       // Inkflow: pressure rises and falls smoothly along the line, plus a little noise per stroke.
       const pressure = 0.5 + 0.5 * Math.sin(xMm * 0.09 + pressPhase);
-      const alpha = 1 - fl * (0.32 * (1 - pressure) + 0.1 * rnd());
+      const alpha = (1 - fl * (0.32 * (1 - pressure) + 0.1 * rnd())) * (1 - 0.1 * tired);
+      const spr = shapeAmt > 0 ? glyphSprite(ch, fontCss, px, bold, boldWidth, o.rgb, Math.floor(rnd() * SHAPE_VARIANTS), shapeAmt) : undefined;
+      if (spr === null) return; // nothing visible to draw
       ctx.save();
       ctx.translate(xMm * k, (yMm + dy) * k);
-      ctx.transform(sc, 0, skew, sc * (1 + range(rnd, -0.04, 0.04) * vr), 0, 0);
+      ctx.transform(sc, 0, skew + lean, sc * tall * (1 + range(rnd, -0.04, 0.04) * vr), 0, 0);
       ctx.rotate(rot);
       ctx.globalAlpha = Math.max(0.35, Math.min(1, bold ? alpha + 0.12 : alpha));
+      if (spr) {
+        // Warped letter (already includes the bold stroke).
+        ctx.drawImage(spr.canvas, -spr.ox, -spr.oy, spr.w, spr.h);
+        if (fl > 0 && !pencil && !bold) {
+          const extra = Math.max(0, (pressure - 0.55) / 0.45);
+          if (extra > 0.05) {
+            ctx.globalAlpha *= 0.15 * fl * extra;
+            ctx.drawImage(spr.canvas, -spr.ox + 0.035 * k, -spr.oy + 0.02 * k, spr.w, spr.h);
+          }
+        }
+        ctx.restore();
+        return;
+      }
       ctx.fillText(ch, 0, 0);
       if (bold) {
         // Bold = pressing harder and going over the letter again.
@@ -297,7 +409,10 @@
       pencil: s.ink === 'pencil',
       rgb: (() => { const [r, g, b] = hexToRgb(s.inkColor); return `rgb(${r}, ${g}, ${b})`; })(),
       leftRef: margins.left,
+      shape: s.letterShape ? 0.35 + 0.65 * (s.variation / 100) : 0,
     };
+    const lpp = Math.max(2, geo.linesPerPage || page.length || 2);
+    const docT = geo.pageCount > 1 ? pageIndex / (geo.pageCount - 1) : 0;
 
     page.forEach((line, i) => {
       if (!line.words.length && !line.marker) return;
@@ -310,6 +425,7 @@
         startX: margins.left + line.indent + drift + range(rand, -0.6, 1.4) * base.mv,
         markerX: margins.left + drift,
         seed: [pageIndex, i],
+        fatigue: s.fatigue ? Math.min(1, 0.8 * Math.pow(i / (lpp - 1), 1.4) + 0.2 * docT) : 0,
       });
     });
 
