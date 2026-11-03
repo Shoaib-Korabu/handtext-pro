@@ -2,6 +2,24 @@
 
 All notable changes to HandText Pro are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.5.0] — 2026-11-03
+
+### Added
+- **Print check**, a simulated printout for the handwritten pages or any PDF or image:
+  - black & white laser (dot gain, toner speckle in light tints), colour laser, colour inkjet, black & white inkjet
+  - plain, bright, recycled or ruled notebook paper, with paper colour and fibres
+  - sheet size, scaling (actual, fit to printable area, custom), printer margin and extra white border
+  - toner density, an overlay showing the area the printer can't reach, and Fit, 100% or 200% zoom
+  - a plain-English summary and one-tap fixes
+  - save the simulation as a PNG or a PDF of all pages
+- **Printing on** option:
+  - digital (full paper look)
+  - plain white paper (ruling and writing, no paper colour or texture)
+  - real notebook paper (writing only)
+
+### Fixed
+- Pages meant for printing no longer carry the on-screen paper colour and texture. On a real printer these turned into a grey tint, with a white frame where the printer can't reach. This is now controlled by **Printing on**.
+
 ## [0.4.0] — 2026-11-03
 
 ### Added

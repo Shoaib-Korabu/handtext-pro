@@ -49,6 +49,11 @@
     if (!/^#[0-9a-f]{6}$/i.test(state.customInk)) state.customInk = HT.DEFAULTS.customInk;
     if (!['off', 'first', 'all'].includes(state.headerOn)) state.headerOn = HT.DEFAULTS.headerOn;
     if (!['standard', 'high'].includes(state.quality)) state.quality = HT.DEFAULTS.quality;
+    if (!['digital', 'white', 'ink'].includes(state.output)) state.output = HT.DEFAULTS.output;
+    const sd = HT.DEFAULTS.sim;
+    const validIds = { printer: HT.PrintSim.PRINTERS, paper: HT.PrintSim.PAPERS, sheet: HT.PrintSim.SHEETS, scaling: HT.PrintSim.SCALINGS };
+    for (const [key, list] of Object.entries(validIds)) if (!list.some((x) => x.id === state.sim[key])) state.sim[key] = sd[key];
+    if (!['fit', 'actual', '200'].includes(state.sim.zoom)) state.sim.zoom = sd.zoom;
     if (!['png', 'jpg'].includes(state.imageFormat)) state.imageFormat = HT.DEFAULTS.imageFormat;
     const clamp = (v, a, b, d) => (Number.isFinite(v) ? Math.min(b, Math.max(a, v)) : d);
     state.fontSize = clamp(state.fontSize, 12, 36, HT.DEFAULTS.fontSize);
@@ -263,6 +268,7 @@
     if (plan.truncated) setStatus(`Only the first ${HT.MAX_PAGES} pages fit. Split very long text into several documents.`, true);
     else if (!plan.fontOk) setStatus(`Couldn't load ${plan.fontLabel}; showing a fallback font.`, true);
     else if (/^(Only the first|Couldn't load)/.test($('status').textContent)) setStatus('');
+    if (simMode && simDoc.kind === 'pages') scheduleSim();
     return plan;
   }
 
@@ -358,6 +364,8 @@
       if ($(id).value !== state.header[key]) $(id).value = state.header[key];
     }
     $('headerOn').value = state.headerOn;
+    $('output').value = state.output;
+    $('outputHelp').textContent = OUTPUT_HELP[state.output] || '';
     for (const key of SWITCHES) $(key).checked = !!state[key];
     $('paper').value = state.paper;
     $('pageSize').value = state.pageSize;
@@ -379,7 +387,8 @@
   function updateSummaries() {
     const ink = state.ink === 'custom' ? 'custom ink' : (HT.INKS.find((i) => i.id === state.ink) || HT.INKS[0]).label.toLowerCase();
     $('sumHand').textContent = `${findFont(state.font).label} \u00B7 ${ink}${state.plainPen ? ' \u00B7 single pen' : ''}`;
-    $('sumPaper').textContent = `${findPaper(state.paper).label.split(' \u2014 ')[0]} \u00B7 ${findSize(state.pageSize).label.split(' (')[0]}`;
+    const outLabel = { digital: 'for screen', white: 'for white paper', ink: 'writing only' }[state.output] || '';
+    $('sumPaper').textContent = `${findPaper(state.paper).label.split(' \u2014 ')[0]} \u00B7 ${findSize(state.pageSize).label.split(' (')[0]} \u00B7 ${outLabel}`;
     const preset = Object.keys(HT.PRESETS).find((n) => Object.keys(HT.PRESETS[n]).every((k) => state[k] === HT.PRESETS[n][k]));
     const extras = [state.letterShape && 'shapes', state.fatigue && 'tiredness'].filter(Boolean);
     $('sumReal').textContent = [preset ? preset[0].toUpperCase() + preset.slice(1) : 'Custom', ...extras].join(' \u00B7 ');
@@ -686,6 +695,310 @@
     setTimeout(cleanup, 120000);
   }
 
+  // ---------------- print check (simulated print) ----------------
+  const PS = HT.PrintSim;
+  const OUTPUT_HELP = {
+    digital: 'Best for uploading or submitting online. If you print this, the paper colour and texture come out as a grey tint with a white frame.',
+    white: 'Clean ruled lines and writing on pure white \u2014 no grey tint when printed. Print on plain white paper.',
+    ink: 'Only the writing is printed. Put ruled notebook paper in the printer, and match Line spacing and the Top margin to your paper so words sit on its lines.',
+  };
+  const simDoc = { kind: 'pages', name: '', pdf: null, image: null };
+  let simMode = false;
+  let simPage = 0;
+  let simSeq = 0;
+  let simTimer = null;
+
+  function fillSimSelect(id, items) {
+    const sel = $(id);
+    items.forEach((it) => { const o = document.createElement('option'); o.value = it.id; o.textContent = it.label; sel.appendChild(o); });
+  }
+
+  function simCount() {
+    if (simDoc.kind === 'pdf') return simDoc.pdf.numPages;
+    if (simDoc.kind === 'image') return 1;
+    return plan ? plan.pages.length : 0;
+  }
+
+  function sheetFor(srcMm) {
+    const sh = PS.SHEETS.find((s) => s.id === state.sim.sheet) || PS.SHEETS[0];
+    if (sh.w) return { w: sh.w, h: sh.h, label: sh.label.split(' (')[0] };
+    // "Same as document": snap to a standard paper size when it's close, else use the page's own size.
+    const match = PS.SHEETS.find((s) => s.w && Math.abs(s.w - srcMm.w) < 3 && Math.abs(s.h - srcMm.h) < 3);
+    return match ? { w: match.w, h: match.h, label: match.label.split(' (')[0] } : { w: srcMm.w, h: srcMm.h, label: 'custom' };
+  }
+
+  async function simSource(i, dpi) {
+    const k = dpi / 25.4;
+    const canvas = document.createElement('canvas');
+    if (simDoc.kind === 'pdf') {
+      const page = await simDoc.pdf.getPage(i + 1);
+      const v1 = page.getViewport({ scale: 1 });
+      const vp = page.getViewport({ scale: dpi / 72 });
+      canvas.width = Math.round(vp.width); canvas.height = Math.round(vp.height);
+      const c = canvas.getContext('2d');
+      c.fillStyle = '#fff'; c.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: c, viewport: vp }).promise;
+      return { canvas, mm: { w: (v1.width / 72) * 25.4, h: (v1.height / 72) * 25.4 } };
+    }
+    if (simDoc.kind === 'image') {
+      // A photo has no physical size; print shops fit it to the sheet.
+      const img = simDoc.image;
+      const sheet = sheetFor({ w: 210, h: 297 });
+      const s = Math.min(sheet.w / img.width, sheet.h / img.height);
+      const mm = { w: img.width * s, h: img.height * s };
+      canvas.width = Math.round(mm.w * k); canvas.height = Math.round(mm.h * k);
+      const c = canvas.getContext('2d');
+      c.fillStyle = '#fff'; c.fillRect(0, 0, canvas.width, canvas.height);
+      c.drawImage(img, 0, 0, canvas.width, canvas.height);
+      return { canvas, mm, sheetHint: sheet };
+    }
+    const p = plan;
+    HT.Render.renderPage(canvas, p.pages[i], i, p.settings, { ...p.geo, k }, p.font, p.extrasFor(i));
+    return { canvas, mm: { w: p.size.w, h: p.size.h } };
+  }
+
+  function simOptions() {
+    return {
+      ...state.sim,
+      ruling: plan ? { settings: plan.settings, margins: plan.geo.margins, lineSpacing: plan.geo.lineSpacing } : null,
+    };
+  }
+
+  async function simulatePage(i, dpi) {
+    const src = await simSource(i, dpi);
+    const sheet = src.sheetHint || sheetFor(src.mm);
+    const res = PS.simulate(src.canvas, src.mm, sheet, simOptions(), dpi);
+    src.canvas.width = src.canvas.height = 1;
+    return { ...res, sheet, srcMm: src.mm };
+  }
+
+  function scheduleSim(delay = 200) {
+    if (!simMode) return;
+    clearTimeout(simTimer);
+    simTimer = setTimeout(renderSim, delay);
+  }
+
+  function simAdvice(cut) {
+    const box = $('simAdvice');
+    box.textContent = '';
+    const add = (msg, actions) => {
+      const p = document.createElement('span');
+      p.textContent = msg;
+      box.appendChild(p);
+      (actions || []).forEach(([label, fn]) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = label;
+        b.addEventListener('click', fn);
+        box.appendChild(b);
+      });
+    };
+    if (simDoc.kind === 'pages') {
+      if (state.output === 'digital') {
+        add('These pages have a coloured paper background and texture, made for screens. On a printer that turns into a grey tint, and the edge the printer can\u2019t reach stays white.', [
+          ['Print on plain white paper', () => setOutput('white')],
+          ['Print onto notebook paper', () => setOutput('ink')],
+        ]);
+      } else if (state.output === 'ink' && state.sim.paper !== 'ruled') {
+        add('You\u2019re printing the writing only, so put ruled notebook paper in the printer.', [
+          ['Show it on ruled paper', () => { state.sim.paper = 'ruled'; syncSimUI(); scheduleSim(0); storage.save(); }],
+        ]);
+      } else if (plan) {
+        const m = plan.geo.margins;
+        const reach = (+state.sim.margin || 0) + (+state.sim.padding || 0);
+        if (state.sim.scaling === 'actual' && Math.min(m.left, m.right, m.top, m.bottom) < reach) {
+          add(`Some of your page margin is narrower than the printer margin (${reach.toFixed(1)} mm), so writing near the edge could be cut off.`, [
+            ['Use Fit to printable area', () => { state.sim.scaling = 'fit'; syncSimUI(); scheduleSim(0); storage.save(); }],
+          ]);
+        }
+      }
+    } else if (cut > 0.3 && state.sim.scaling === 'actual') {
+      add('Part of this document\u2019s edge falls where the printer can\u2019t print.', [
+        ['Use Fit to printable area', () => { state.sim.scaling = 'fit'; syncSimUI(); scheduleSim(0); storage.save(); }],
+      ]);
+    }
+    box.hidden = !box.childNodes.length;
+  }
+
+  function setOutput(v) {
+    state.output = v;
+    syncUI();
+    scheduleRender(0);
+    storage.save();
+  }
+
+  async function renderSim() {
+    if (!simMode) return;
+    const seq = ++simSeq;
+    if (simDoc.kind === 'pages' && !plan) await renderPreview();
+    const count = simCount();
+    if (!count) return;
+    simPage = Math.max(0, Math.min(count - 1, simPage));
+    const zoom = state.sim.zoom;
+    const dpi = zoom === '200' ? 260 : zoom === 'actual' ? 200 : Math.min(170, Math.round(110 * Math.min(2, window.devicePixelRatio || 1)));
+    const sheetEl = $('simSheetEl');
+    sheetEl.classList.add('busy');
+    await new Promise((r) => setTimeout(r, 20));
+    try {
+      const res = await simulatePage(simPage, dpi);
+      if (seq !== simSeq) { res.canvas.width = res.canvas.height = 1; return; }
+      const cv = $('simCanvas');
+      cv.width = res.canvas.width; cv.height = res.canvas.height;
+      cv.getContext('2d').drawImage(res.canvas, 0, 0);
+      res.canvas.width = res.canvas.height = 1;
+
+      const { sheet, placement: pl } = res;
+      if (zoom === 'fit') { sheetEl.style.width = `min(100%, calc((85vh - 56px) * ${sheet.w / sheet.h}))`; }
+      else sheetEl.style.width = `${sheet.w * (zoom === '200' ? 2 : 1)}mm`;
+      sheetEl.style.aspectRatio = `${sheet.w} / ${sheet.h}`;
+      const area = $('simArea');
+      area.hidden = !state.sim.showArea;
+      area.style.left = `${(pl.printable.x / sheet.w) * 100}%`;
+      area.style.top = `${(pl.printable.y / sheet.h) * 100}%`;
+      area.style.width = `${(pl.printable.w / sheet.w) * 100}%`;
+      area.style.height = `${(pl.printable.h / sheet.h) * 100}%`;
+
+      const info = PS.describe(res.srcMm, sheet, state.sim);
+      const printer = PS.PRINTERS.find((p) => p.id === state.sim.printer) || PS.PRINTERS[0];
+      $('simSummary').textContent = `${printer.color ? 'Colour' : 'Black & white'} print on ${sheet.label} paper. ${info.text}`;
+      $('simPageInfo').textContent = `Page ${simPage + 1} of ${count}`;
+      $('simPrev').disabled = simPage === 0;
+      $('simNext').disabled = simPage >= count - 1;
+      simAdvice(info.cut);
+    } catch (err) {
+      console.error(err);
+      setStatus(`Print check failed: ${err.message || err}`, true);
+    } finally {
+      if (seq === simSeq) sheetEl.classList.remove('busy');
+    }
+  }
+
+  function syncSimUI() {
+    const s = state.sim;
+    $('simSource').value = simDoc.kind === 'pages' ? 'pages' : 'file';
+    $('simPrinter').value = s.printer;
+    $('simPaper').value = s.paper;
+    $('simSheet').value = s.sheet;
+    $('simScaling').value = s.scaling;
+    $('simScaleField').hidden = s.scaling !== 'custom';
+    if (document.activeElement !== $('simScale')) $('simScale').value = s.scale;
+    if (document.activeElement !== $('simMargin')) $('simMargin').value = s.margin;
+    if (document.activeElement !== $('simPadding')) $('simPadding').value = s.padding;
+    $('simDensity').value = s.density;
+    $('simDensityOut').textContent = `${s.density}%`;
+    $('simShowArea').checked = s.showArea;
+    $('simZoom').value = s.zoom;
+    if (simDoc.kind !== 'pages') $('simSource').options[1].textContent = simDoc.name;
+    else $('simSource').options[1].textContent = 'Another PDF or image\u2026';
+  }
+
+  function setMode(mode) {
+    simMode = mode === 'sim';
+    document.body.dataset.mode = simMode ? 'sim' : 'pages';
+    $('modePages').setAttribute('aria-selected', String(!simMode));
+    $('modeSim').setAttribute('aria-selected', String(simMode));
+    $('simPanel').hidden = !simMode;
+    if (simMode) { syncSimUI(); renderSim(); }
+  }
+
+  async function openSimFile(file) {
+    const name = file.name || 'file';
+    const isPdf = /\.pdf$/i.test(name) || file.type === 'application/pdf';
+    const isImg = /^image\//.test(file.type) || /\.(png|jpe?g|gif|webp|bmp)$/i.test(name);
+    if (!isPdf && !isImg) { setStatus('Print check can open PDFs and images (JPG, PNG).', true); syncSimUI(); return; }
+    setStatus(`Opening ${name}\u2026`);
+    try {
+      if (simDoc.pdf) { simDoc.pdf.destroy(); simDoc.pdf = null; }
+      if (isPdf) {
+        const pdfjs = await HT.Import.loadPdfJs();
+        simDoc.pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false }).promise;
+        simDoc.kind = 'pdf';
+      } else {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.src = url;
+        await img.decode();
+        simDoc.image = img;
+        simDoc.kind = 'image';
+      }
+      simDoc.name = name;
+      simPage = 0;
+      setStatus(`Print check: ${name}`);
+      syncSimUI();
+      renderSim();
+    } catch (err) {
+      setStatus(err && err.name === 'PasswordException' ? 'That PDF is password-protected.' : `Couldn't open ${name}.`, true);
+      syncSimUI();
+    }
+  }
+
+  function bindSim() {
+    fillSimSelect('simPrinter', PS.PRINTERS);
+    fillSimSelect('simPaper', PS.PAPERS);
+    fillSimSelect('simSheet', PS.SHEETS);
+    fillSimSelect('simScaling', PS.SCALINGS);
+    $('modePages').addEventListener('click', () => setMode('pages'));
+    $('modeSim').addEventListener('click', () => setMode('sim'));
+    $('simSource').addEventListener('change', (e) => {
+      if (e.target.value === 'file') $('simFile').click();
+      else {
+        simDoc.kind = 'pages'; simDoc.name = ''; simPage = 0;
+        if (simDoc.pdf) { simDoc.pdf.destroy(); simDoc.pdf = null; }
+        simDoc.image = null;
+        setStatus('');
+        syncSimUI(); renderSim();
+      }
+    });
+    $('simFile').addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (f) openSimFile(f); else syncSimUI();
+    });
+    const bindSel = (id, key) => $(id).addEventListener('change', (e) => { state.sim[key] = e.target.value; syncSimUI(); scheduleSim(0); storage.save(); });
+    bindSel('simPrinter', 'printer');
+    bindSel('simPaper', 'paper');
+    bindSel('simSheet', 'sheet');
+    bindSel('simScaling', 'scaling');
+    bindSel('simZoom', 'zoom');
+    const bindNum = (id, key, lo, hi) => $(id).addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      if (Number.isFinite(v)) { state.sim[key] = Math.min(hi, Math.max(lo, v)); scheduleSim(); storage.save(); }
+    });
+    bindNum('simScale', 'scale', 10, 400);
+    bindNum('simMargin', 'margin', 0, 30);
+    bindNum('simPadding', 'padding', 0, 50);
+    $('simDensity').addEventListener('input', (e) => { state.sim.density = +e.target.value; $('simDensityOut').textContent = `${state.sim.density}%`; scheduleSim(); storage.save(); });
+    $('simShowArea').addEventListener('change', (e) => { state.sim.showArea = e.target.checked; $('simArea').hidden = !e.target.checked; storage.save(); });
+    $('simPrev').addEventListener('click', () => { simPage--; renderSim(); });
+    $('simNext').addEventListener('click', () => { simPage++; renderSim(); });
+    $('simSavePng').addEventListener('click', () => busy($('simSavePng'), async () => {
+      const res = await simulatePage(simPage, 200);
+      const blob = await new Promise((r) => res.canvas.toBlob(r, 'image/png'));
+      res.canvas.width = res.canvas.height = 1;
+      HT.Export.saveBlob(blob, `print-check-page-${simPage + 1}.png`);
+      setStatus(`Saved print-check-page-${simPage + 1}.png`);
+    }));
+    $('simSavePdf').addEventListener('click', () => busy($('simSavePdf'), async () => {
+      const first = await simSource(0, 20);
+      const sheet = first.sheetHint || sheetFor(first.mm);
+      first.canvas.width = first.canvas.height = 1;
+      const job = {
+        count: simCount(),
+        size: { w: sheet.w, h: sheet.h },
+        renderTo: async (i, canvas) => {
+          const res = await simulatePage(i, 200);
+          canvas.width = res.canvas.width; canvas.height = res.canvas.height;
+          canvas.getContext('2d').drawImage(res.canvas, 0, 0);
+          res.canvas.width = res.canvas.height = 1;
+        },
+      };
+      const base = simDoc.kind === 'pages' ? docName : HT.Export.safeName(simDoc.name);
+      const name = await HT.Export.pdf(job, `${base}-print-check`, (m) => setStatus(m));
+      setStatus(`Saved ${name} \u2014 this is how the printout will look.`);
+    }));
+    $('output').addEventListener('change', (e) => setOutput(e.target.value));
+  }
+
   // ---------------- start ----------------
   function init() {
     $('version').textContent = `v${HT.VERSION.replace(/\.0$/, '')}`;
@@ -697,7 +1010,9 @@
     syncUI();
     bindControls();
     bindUpload();
+    bindSim();
     document.body.dataset.view = 'edit';
+    document.body.dataset.mode = 'pages';
     renderPreview();
   }
 

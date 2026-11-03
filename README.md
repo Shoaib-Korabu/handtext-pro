@@ -4,7 +4,7 @@ A free, open-source text-to-handwriting generator. **Upload your assignment** (P
 
 It's inspired by the feature set of tools like HandtextAI, but it's written from scratch with open-source fonts and libraries. Everything runs in your browser, so your text is never uploaded anywhere.
 
-**Current version: v0.4.0** · [Changelog](CHANGELOG.md)
+**Current version: v0.5.0** · [Changelog](CHANGELOG.md)
 
 🌐 **Live demo:** https://shoaib-korabu.github.io/handtext-pro/
 
@@ -23,6 +23,23 @@ It's inspired by the feature set of tools like HandtextAI, but it's written from
 - The handwritten PDF downloads automatically. You can switch this off to check the preview first.
 - **Undo** brings back your previous text.
 - Helpful messages for scanned PDFs, password-protected files, old `.doc` files and photos.
+
+**🖨 Print check: see the printout before you pay for it** *(new in v0.5)*
+- A print-shop simulator that shows how each page will really come out of a printer.
+- **Printers:** black & white laser (most shops), colour laser, colour inkjet, black & white inkjet. In black & white, colours turn to grey toner and light tints become speckle.
+- **Paper in the printer:** plain white copier paper, bright white, recycled, or ruled notebook paper.
+- **Sheet size:** same as document, A4, Letter, Legal or A5.
+- **Scaling:** Actual size (100%), Fit to printable area, or a custom percentage.
+- **Printer margin:** the outer edge a printer can't reach (default 4.2 mm), shown with a dashed red line. Add an extra white border if you want one.
+- **Toner/ink density**, and zoom to Fit, Real size (100%) or Close-up (200%).
+- It explains in plain words what will happen, for example "4.2 mm of the edge is cut off", and suggests fixes you can apply with one tap.
+- Works on these handwritten pages **or any PDF or image** you open.
+- Save the simulated printout as a PNG, or all pages as a PDF.
+
+**Printing on** *(new in v0.5)*: choose what the output is for.
+- **Digital submission:** the full paper look, with colour, texture and ruling.
+- **Plain white paper:** ruled lines and writing on pure white, with no grey tint when printed.
+- **Real ruled notebook paper:** only the writing is printed, so it lands on your own paper's lines.
 
 **More human handwriting** *(new in v0.4)*
 - **Letter shape variation** (switch, on by default): each letter's strokes are gently bent, so repeated letters really differ in shape: rounder or flatter loops, longer or shorter tails. Its strength follows the *Vary each letter* slider.
@@ -108,6 +125,7 @@ js/layout.js        text parsing, word wrap and pagination (pure; unit-tested)
 js/importer.js      PDF / Word / text upload → markup (structure rebuild is unit-tested)
 js/render.js        paper drawing, handwriting realism engine, header and page numbers
 js/export.js        PDF / image / ZIP / print export, one page at a time
+js/printsim.js      Print check: printer/paper/margin/scaling simulation (placement maths unit-tested)
 js/app.js           app state, controls, preview, downloads
 fonts/              18 handwriting fonts (woff2)
 vendor/             jsPDF, JSZip, pdf.js, mammoth.js (pdf.js and mammoth load only when you upload)
@@ -121,7 +139,8 @@ test/               unit tests (node:test)
 | **v0.1** | ✅ Core generator: 18 fonts, 7 papers, 4 page sizes, realism engine, PDF/PNG/JPG/ZIP, print |
 | **v0.3** | ✅ Upload PDF/Word/text assignments → handwritten PDF in one go; bold text; name/roll/subject/date header; page numbers; mobile tabs; faster and lighter preview and export |
 | **v0.4** | ✅ Letter shape variation, tiredness over the page, green on/off switches, section summaries, step guide |
-| v0.4.x | Fit into N pages; leave space for diagrams; Indian notebook styles (Page No./Date box); saved styles |
+| **v0.5** | ✅ Print check simulator (B&W/colour, printer margin, scaling, padding, toner, paper types, any PDF/image); "Printing on" output modes |
+| v0.6 | Fit into N pages; leave space for diagrams; Indian notebook styles (Page No./Date box); saved styles; print alignment test sheet |
 | v0.5 | Math notation (fractions, powers, symbols); images inside notes; PowerPoint import |
 | v1.0 | **Photo mode**: pages placed in realistic notebook/desk scenes; stable public release |
 | v2.0 | Upload your own handwriting font (TTF/OTF/WOFF) |

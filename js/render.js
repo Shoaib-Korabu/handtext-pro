@@ -55,13 +55,24 @@
   }
 
   // ---------- paper ----------
-  function drawPaper(ctx, s, geo) {
+  /**
+   * s.output decides what goes on the page:
+   *   'digital' — full paper look (colour, ruling, texture) for screens / online submission
+   *   'white'   — ruling + ink on pure white: for printing on plain white paper
+   *   'ink'     — ink only: for printing onto real ruled notebook paper
+   * opts.noFill draws only the ruling (used by Print check to draw real notebook paper).
+   */
+  function drawPaper(ctx, s, geo, opts) {
     const { k, pageW, pageH, margins, lineSpacing } = geo;
     const paper = HT.PAPERS.find((p) => p.id === s.paper) || HT.PAPERS[0];
     const W = pageW * k, H = pageH * k;
+    const output = s.output || 'digital';
 
-    ctx.fillStyle = paper.bg;
-    ctx.fillRect(0, 0, W, H);
+    if (!(opts && opts.noFill)) {
+      ctx.fillStyle = output === 'digital' ? paper.bg : '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (output === 'ink') return; // the real paper already has its lines
 
     const hLine = (y, color, width) => {
       ctx.strokeStyle = color;
@@ -125,8 +136,9 @@
       default: break; // plain, cardstock
     }
 
-    // Texture: grain + soft blotches, multiplied onto the paper.
-    const amount = s.texture / 100 * (paper.id === 'cardstock' ? 1.4 : 1);
+    // Texture: grain + soft blotches, multiplied onto the paper (screen output only —
+    // printed, it would come out as grey smudges on real paper).
+    const amount = output === 'digital' ? s.texture / 100 * (paper.id === 'cardstock' ? 1.4 : 1) : 0;
     if (amount > 0) {
       ctx.save();
       ctx.globalCompositeOperation = 'multiply';
@@ -535,5 +547,5 @@
   /** Free the shared ink layer (e.g. after a big export). */
   function releaseMemory() { if (inkCanvas) { inkCanvas.width = 1; inkCanvas.height = 1; } }
 
-  HT.Render = { renderPage, releaseMemory, mulberry32, seedOf };
+  HT.Render = { renderPage, drawPaper, releaseMemory, mulberry32, seedOf, getNoise };
 })(typeof window !== 'undefined' ? window : globalThis);

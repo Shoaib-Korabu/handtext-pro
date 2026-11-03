@@ -47,7 +47,7 @@
     for (let i = 0; i < job.count; i++) {
       onProgress && onProgress(`Creating PDF: page ${i + 1} of ${job.count}\u2026`);
       await nextFrame();
-      job.renderTo(i, canvas);
+      await job.renderTo(i, canvas);
       if (i > 0) doc.addPage([w, h], w > h ? 'landscape' : 'portrait');
       const blob = await toBlob(canvas, 'image/jpeg', 0.85);
       doc.addImage(new Uint8Array(await blob.arrayBuffer()), 'JPEG', 0, 0, w, h, `p${i}`, 'NONE');
@@ -68,7 +68,7 @@
       if (job.count === 1) {
         onProgress && onProgress('Creating image\u2026');
         await nextFrame();
-        job.renderTo(0, canvas);
+        await job.renderTo(0, canvas);
         const name = `${base}.${ext}`;
         saveBlob(await toBlob(canvas, type, 0.92), name);
         return name;
@@ -79,7 +79,7 @@
       for (let i = 0; i < job.count; i++) {
         onProgress && onProgress(`Creating images: page ${i + 1} of ${job.count}\u2026`);
         await nextFrame();
-        job.renderTo(i, canvas);
+        await job.renderTo(i, canvas);
         zip.file(`page-${String(i + 1).padStart(pad, '0')}.${ext}`, await toBlob(canvas, type, 0.92));
       }
       onProgress && onProgress('Packing ZIP\u2026');
@@ -99,7 +99,7 @@
       for (let i = 0; i < job.count; i++) {
         onProgress && onProgress(`Preparing page ${i + 1} of ${job.count} for printing\u2026`);
         await nextFrame();
-        job.renderTo(i, canvas);
+        await job.renderTo(i, canvas);
         urls.push(URL.createObjectURL(await toBlob(canvas, 'image/jpeg', 0.92)));
       }
     } catch (err) {

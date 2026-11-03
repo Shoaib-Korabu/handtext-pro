@@ -15,7 +15,7 @@
     <div class="brand">
       <span class="logo" aria-hidden="true">✍</span>
       <span class="name">HandText <b>Pro</b></span>
-      <span class="badge" id="version">v0.4</span>
+      <span class="badge" id="version">v0.5</span>
     </div>
     <p class="tagline">Upload or type → realistic handwriting → print-ready pages. Free and private: everything happens in your browser.</p>
   </header>
@@ -133,6 +133,13 @@
 
       <details class="card" open>
         <summary><span class="sum-title">📄 Paper &amp; page</span><span class="sum-val" id="sumPaper"></span></summary>
+        <label class="field"><span class="lbl">Printing on</span>
+          <select id="output">
+            <option value="digital">Nothing — I'll submit it digitally (full paper look)</option>
+            <option value="white">Plain white paper (lines + writing, no paper colour)</option>
+            <option value="ink">Real ruled notebook paper (writing only)</option>
+          </select>
+          <small id="outputHelp"></small></label>
         <div class="row2">
           <label class="field"><span class="lbl">Paper</span><select id="paper"></select></label>
           <label class="field"><span class="lbl">Page size</span><select id="pageSize"></select></label>
@@ -169,6 +176,10 @@
     </aside>
 
     <section class="preview" id="preview" aria-label="Preview">
+      <div class="segmented" role="tablist" aria-label="Preview mode">
+        <button type="button" role="tab" id="modePages" aria-selected="true">📄 Handwritten pages</button>
+        <button type="button" role="tab" id="modeSim" aria-selected="false">🖨 Print check</button>
+      </div>
       <div class="preview-bar">
         <div class="preview-info">
           <span id="pageInfo" class="meta"></span>
@@ -180,6 +191,52 @@
         </div>
       </div>
       <div id="pages" class="pages"></div>
+
+      <div id="simPanel" class="sim" hidden>
+        <p class="sim-intro">See exactly how each page will come out of a real printer, before you pay for prints. Match these settings to the print shop.</p>
+        <div class="sim-controls">
+          <label class="field"><span class="lbl">What to print</span>
+            <select id="simSource">
+              <option value="pages">These handwritten pages</option>
+              <option value="file">Another PDF or image…</option>
+            </select></label>
+          <label class="field"><span class="lbl">Printer</span><select id="simPrinter"></select></label>
+          <label class="field"><span class="lbl">Paper in the printer</span><select id="simPaper"></select></label>
+          <label class="field"><span class="lbl">Sheet size</span><select id="simSheet"></select></label>
+          <label class="field"><span class="lbl">Scaling</span><select id="simScaling"></select></label>
+          <label class="field" id="simScaleField"><span class="lbl">Custom scale (%)</span><input type="number" id="simScale" min="10" max="400" step="1" inputmode="numeric"></label>
+          <label class="field"><span class="lbl">Printer margin (mm) <span class="hint" title="Most laser printers can't print the outer 4–5 mm of the sheet; inkjets about 3 mm.">?</span></span><input type="number" id="simMargin" min="0" max="30" step="0.1" inputmode="decimal"></label>
+          <label class="field"><span class="lbl">Extra white border (mm)</span><input type="number" id="simPadding" min="0" max="50" step="0.5" inputmode="decimal"></label>
+          <label class="field"><span class="lbl">Toner / ink <output id="simDensityOut"></output></span><input type="range" id="simDensity" min="60" max="140" step="5"></label>
+          <label class="field"><span class="lbl">Zoom</span>
+            <select id="simZoom">
+              <option value="fit">Fit to screen</option>
+              <option value="actual">Real size (100%)</option>
+              <option value="200">Close-up (200%)</option>
+            </select></label>
+        </div>
+        <label class="switch-row sim-switch">
+          <span class="switch-text"><b>Show the area the printer can't reach</b><small>A dashed red line marks the printer margin</small></span>
+          <input type="checkbox" role="switch" class="switch" id="simShowArea">
+        </label>
+        <input type="file" id="simFile" accept=".pdf,image/*,application/pdf" hidden>
+        <div class="sim-advice" id="simAdvice" hidden></div>
+        <div class="sim-nav">
+          <button type="button" id="simPrev" aria-label="Previous page">◀</button>
+          <span id="simPageInfo" class="meta"></span>
+          <button type="button" id="simNext" aria-label="Next page">▶</button>
+          <span class="sim-spacer"></span>
+          <button type="button" id="simSavePng">Save this page (PNG)</button>
+          <button type="button" id="simSavePdf">Save all as PDF</button>
+        </div>
+        <p class="sim-summary" id="simSummary"></p>
+        <div class="sim-stage" id="simStage">
+          <div class="sim-sheet" id="simSheetEl">
+            <canvas id="simCanvas" aria-label="Simulated printed page"></canvas>
+            <div class="sim-area" id="simArea"></div>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -195,6 +252,7 @@
   <script src="js/render.js"></script>
   <script src="js/importer.js"></script>
   <script src="js/export.js"></script>
+  <script src="js/printsim.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

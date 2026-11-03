@@ -449,7 +449,14 @@
     return { text, note: res.note || '', kind };
   }
 
-  const api = { importFile, readPdfPages, pdfLinesToMarkup, tidyMarkdown, htmlToMarkup, segmentsToText };
+  /** Load pdf.js on demand and return it (used by Print check to open any PDF). */
+  async function loadPdfJs() {
+    await loadScript('vendor/pdfjs/pdf.min.js');
+    root.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.js';
+    return root.pdfjsLib;
+  }
+
+  const api = { importFile, loadPdfJs, readPdfPages, pdfLinesToMarkup, tidyMarkdown, htmlToMarkup, segmentsToText };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else (root.HT = root.HT || {}).Import = api;
 })(typeof window !== 'undefined' ? window : globalThis);

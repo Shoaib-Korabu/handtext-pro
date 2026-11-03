@@ -5,7 +5,7 @@
   'use strict';
   const HT = (root.HT = root.HT || {});
 
-  HT.VERSION = '0.4.0';
+  HT.VERSION = '0.5.0';
 
   // `cursive: true` = joined-up script; per-letter jitter is reduced so joins stay connected.
   HT.FONTS = [
@@ -88,6 +88,8 @@
     plainPen: true,      // one pen: no bold strokes, no big or underlined headings
     letterShape: true,   // warp each letter's strokes so repeated letters differ in shape
     fatigue: false,      // writing gets looser and faster further down each page
+    output: 'digital',   // 'digital' (full paper look) | 'white' (plain white paper) | 'ink' (real notebook paper)
+    sim: { source: 'pages', printer: 'bw-laser', paper: 'white', sheet: 'auto', scaling: 'actual', scale: 100, margin: 4.2, padding: 0, density: 100, showArea: true, zoom: 'fit' },
   };
 
   HT.PAGE_BREAK = '[pagebreak]';
