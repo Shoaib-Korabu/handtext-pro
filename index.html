@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>HandText Pro</title>
-  <meta name="description" content="Free text-to-handwriting generator: type notes, choose a handwriting and paper, and download print-ready PDF or images.">
+  <meta name="description" content="Free text-to-handwriting generator: upload an assignment or type notes, pick a handwriting and paper, and download print-ready PDF or images.">
+  <meta name="theme-color" content="#2547d0">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%E2%9C%8D%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/app.css">
   <style id="print-page-size"></style>
@@ -14,26 +15,60 @@
     <div class="brand">
       <span class="logo" aria-hidden="true">✍</span>
       <span class="name">HandText <b>Pro</b></span>
-      <span class="badge" id="version">v0.1</span>
+      <span class="badge" id="version">v0.3</span>
     </div>
-    <p class="tagline">Typed text → realistic handwriting → print-ready pages. Free, private, in your browser.</p>
+    <p class="tagline">Upload or type → realistic handwriting → print-ready pages. Free and private: everything happens in your browser.</p>
   </header>
 
+  <nav class="tabs" role="tablist" aria-label="View">
+    <button type="button" role="tab" id="tabEdit" aria-selected="true" aria-controls="sidebar">Edit</button>
+    <button type="button" role="tab" id="tabPreview" aria-selected="false" aria-controls="preview">Preview <span id="tabCount"></span></button>
+  </nav>
+
   <main class="layout">
-    <aside class="sidebar" aria-label="Settings">
+    <aside class="sidebar" id="sidebar" aria-label="Settings">
+
+      <section class="card upload-card">
+        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-describedby="dropHint">
+          <span class="drop-icon" aria-hidden="true">📄</span>
+          <span class="drop-title">Upload your assignment</span>
+          <span class="drop-hint" id="dropHint">PDF, Word (.docx), .txt or .md · tap to choose or drag &amp; drop</span>
+        </div>
+        <input type="file" id="importFile" accept=".pdf,.docx,.txt,.md,.markdown,.html,.htm,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/html" hidden>
+        <label class="check"><input type="checkbox" id="autoDownload"> <span>Download the PDF automatically after upload</span></label>
+      </section>
 
       <details class="card" open>
         <summary>Text</summary>
         <div class="toolbar">
-          <button type="button" id="importBtn" class="chip">Import .txt / .md</button>
           <button type="button" id="breakBtn" class="chip">Insert page break</button>
           <button type="button" id="sampleBtn" class="chip">Sample</button>
           <button type="button" id="clearBtn" class="chip">Clear</button>
-          <input type="file" id="importFile" accept=".txt,.md,.markdown,text/plain,text/markdown" hidden>
+          <button type="button" id="undoBtn" class="chip" hidden>Undo</button>
         </div>
-        <textarea id="text" rows="14" spellcheck="true" placeholder="Type or paste your notes here…"></textarea>
-        <p class="help"><code># Heading</code> · <code>## Subheading</code> · <code>- bullet</code> · <code>1. numbered</code> · <code>[pagebreak]</code></p>
+        <textarea id="text" rows="14" spellcheck="true" placeholder="Type or paste your notes here, or upload a file above…"></textarea>
+        <p class="help"><code># Heading</code> <code>## Subheading</code> <code>### Bold line</code> <code>- bullet</code> <code>1. numbered</code> <code>**bold**</code> <code>[pagebreak]</code></p>
         <p class="meta" id="textMeta"></p>
+      </details>
+
+      <details class="card">
+        <summary>Assignment details</summary>
+        <div class="row2">
+          <label class="field"><span class="lbl">Name</span><input type="text" id="hName" autocomplete="name"></label>
+          <label class="field"><span class="lbl">Roll no.</span><input type="text" id="hRoll"></label>
+          <label class="field"><span class="lbl">Subject</span><input type="text" id="hSubject"></label>
+          <label class="field"><span class="lbl">Date <button type="button" class="link" id="todayBtn">Today</button></span><input type="text" id="hDate" placeholder="dd/mm/yyyy"></label>
+        </div>
+        <div class="row2">
+          <label class="field"><span class="lbl">Show details</span>
+            <select id="headerOn">
+              <option value="off">Don't show</option>
+              <option value="first">First page only</option>
+              <option value="all">Every page</option>
+            </select></label>
+          <label class="check check-inline"><input type="checkbox" id="pageNumbers"> <span>Page numbers</span></label>
+        </div>
+        <small class="muted">Written in your chosen handwriting in the top margin.</small>
       </details>
 
       <details class="card" open>
@@ -62,10 +97,10 @@
           <input type="range" id="lineSpacing" min="5" max="14" step="0.1"></label>
         <fieldset class="margins">
           <legend class="lbl">Margins (mm)</legend>
-          <label>Top <input type="number" id="mTop" min="0" max="80" step="1"></label>
-          <label>Bottom <input type="number" id="mBottom" min="0" max="80" step="1"></label>
-          <label>Left <input type="number" id="mLeft" min="0" max="80" step="1"></label>
-          <label>Right <input type="number" id="mRight" min="0" max="80" step="1"></label>
+          <label>Top <input type="number" id="mTop" min="0" max="80" step="1" inputmode="numeric"></label>
+          <label>Bottom <input type="number" id="mBottom" min="0" max="80" step="1" inputmode="numeric"></label>
+          <label>Left <input type="number" id="mLeft" min="0" max="80" step="1" inputmode="numeric"></label>
+          <label>Right <input type="number" id="mRight" min="0" max="80" step="1" inputmode="numeric"></label>
         </fieldset>
       </details>
 
@@ -100,35 +135,42 @@
             </select></label>
           <label class="field"><span class="lbl">Image format</span>
             <select id="imageFormat">
-              <option value="png">PNG</option>
-              <option value="jpg">JPG</option>
+              <option value="jpg">JPG (smaller)</option>
+              <option value="png">PNG (lossless)</option>
             </select></label>
         </div>
         <div class="actions">
-          <button type="button" id="pdfBtn" class="primary">Download PDF</button>
           <button type="button" id="imgBtn">Download images</button>
-          <button type="button" id="printBtn">Print</button>
         </div>
-        <p class="status" id="status" role="status" aria-live="polite"></p>
       </details>
     </aside>
 
-    <section class="preview" aria-label="Preview">
-      <div class="preview-head">
-        <span class="lbl">Preview</span>
-        <span id="pageInfo" class="meta"></span>
+    <section class="preview" id="preview" aria-label="Preview">
+      <div class="preview-bar">
+        <div class="preview-info">
+          <span id="pageInfo" class="meta"></span>
+          <span class="status" id="status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="actions">
+          <button type="button" id="pdfBtn" class="primary">Download PDF</button>
+          <button type="button" id="printBtn">Print</button>
+        </div>
       </div>
       <div id="pages" class="pages"></div>
     </section>
   </main>
 
-  <footer class="foot">HandText Pro · open source · your text never leaves your browser</footer>
+  <div id="printArea" class="print-area" aria-hidden="true"></div>
+  <div id="dragOverlay" class="drag-overlay" hidden><div>Drop your file to turn it into handwriting</div></div>
+
+  <footer class="foot">HandText Pro · open source · your files and text never leave your browser</footer>
 
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="vendor/jszip.min.js"></script>
   <script src="js/config.js"></script>
   <script src="js/layout.js"></script>
   <script src="js/render.js"></script>
+  <script src="js/importer.js"></script>
   <script src="js/export.js"></script>
   <script src="js/app.js"></script>
 </body>

@@ -2,6 +2,37 @@
 
 All notable changes to HandText Pro are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.3.0] — 2026-11-03
+
+### Added
+- **Upload an assignment:** PDF, Word (.docx), .txt, .md or .html becomes handwritten pages, and the PDF downloads automatically. This can be switched off.
+- PDF structure rebuild:
+  - Titles, questions and bold sub-headings become headings.
+  - Bullets and numbered lists are kept, and bold lead-ins stay bold.
+  - Wrapped lines and hyphenated words are joined back together.
+  - Page numbers and repeated headers or footers are dropped.
+- Word import keeps headings, lists, bold and table rows. A Word "Title" style becomes the top heading.
+- Drag and drop anywhere on the page, plus an Undo after import or clear.
+- Clear messages for scanned PDFs, password-protected PDFs, old `.doc` files, photos and unsupported formats.
+- `### Bold line` headings and inline `**bold**` text, drawn with heavier pen strokes.
+- Assignment details (name, roll no., subject, date) written in the top margin, on the first page or every page, with a "Today" button.
+- Handwritten page numbers.
+- A sticky preview bar with Download PDF and Print always in reach, and live progress messages.
+- Edit and Preview tabs on phones.
+
+### Changed
+- Exports render one page at a time, so large documents no longer risk running out of memory.
+- The preview only draws pages near the screen, and frees far-away pages in long documents.
+- Print now uses 200 DPI page images at the exact paper size. Ctrl/Cmd+P uses the same path.
+- Exported files are named after the uploaded file, for example `assignment-handwritten-….pdf`.
+- JPG is the default image format, giving files about 5× smaller than PNG.
+- The page limit is raised from 50 to 100.
+
+### Fixed
+- A wrapped heading near the bottom of a page could be left stranded without its first line.
+- Saved settings with out-of-range or removed values (font, paper, margins) could break the layout after an update.
+- Non-ASCII characters in the source are now escaped, so scripts work whatever encoding they are served with.
+
 ## [0.1.0] — 2026-11-03
 
 First release.

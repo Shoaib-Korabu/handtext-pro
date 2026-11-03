@@ -76,6 +76,40 @@ test('page count is capped', () => {
   assert.equal(r.truncated, true);
 });
 
+test('### headings are bold and **bold** markers are read', () => {
+  const blocks = parse('### Key terms\nA **bold** word and **a bold phrase** here, plus odd ** marker');
+  assert.equal(blocks[0].type, 'heading');
+  assert.equal(blocks[0].level, 3);
+  const { pages } = layout(blocks, { ...base, contentWidth: 400 });
+  assert.ok(pages[0][0].words.every((w) => w.bold === true));
+  const words = pages[0][1].words;
+  const byText = Object.fromEntries(words.map((w) => [w.text, w.bold]));
+  assert.equal(byText.bold, true);
+  assert.equal(byText.phrase, true);
+  assert.equal(byText.word, false);
+  assert.ok(words.some((w) => w.text === '**'), 'unmatched ** stays as text');
+});
+
+test('partly bold words keep a per-letter mask', () => {
+  const { inlineWords } = require('../js/layout.js');
+  const [w] = inlineWords('**Note**:');
+  assert.equal(w.text, 'Note:');
+  assert.deepEqual(w.bold, [true, true, true, true, false]);
+});
+
+test('bullets pasted from Word/PDF (private-use glyphs) become list items', () => {
+  const blocks = parse(' item one\n● item two\n• item three');
+  assert.deepEqual(blocks.map((b) => b.type), ['list', 'list', 'list']);
+  assert.equal(blocks[0].text, 'item one');
+});
+
+test('a wrapped heading near the page bottom moves to the next page with its first line', () => {
+  const text = 'a\nb\nc\n## ' + 'word '.repeat(12) + '\nbody';
+  const { pages } = layout(parse(text), base);
+  assert.equal(pages[0].length, 3);
+  assert.ok(pages[1][0].heading === 2);
+});
+
 test('linesPerPage uses the space between top and bottom margins', () => {
   assert.equal(linesPerPage(297, { top: 25, bottom: 15 }, 8), 32);
   assert.equal(linesPerPage(50, { top: 25, bottom: 25 }, 8), 1);

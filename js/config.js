@@ -5,7 +5,7 @@
   'use strict';
   const HT = (root.HT = root.HT || {});
 
-  HT.VERSION = '0.1.0';
+  HT.VERSION = '0.3.0';
 
   // `cursive: true` = joined-up script; per-letter jitter is reduced so joins stay connected.
   HT.FONTS = [
@@ -31,15 +31,15 @@
 
   // Page sizes in millimetres (portrait).
   HT.PAGE_SIZES = [
-    { id: 'a4',     label: 'A4 (210 × 297 mm)',   w: 210,   h: 297 },
-    { id: 'letter', label: 'US Letter (8.5 × 11 in)', w: 215.9, h: 279.4 },
-    { id: 'a5',     label: 'A5 (148 × 210 mm)',   w: 148,   h: 210 },
-    { id: 'note',   label: 'Note card (4 × 6 in)', w: 101.6, h: 152.4 },
+    { id: 'a4',     label: 'A4 (210 \u00D7 297 mm)',   w: 210,   h: 297 },
+    { id: 'letter', label: 'US Letter (8.5 \u00D7 11 in)', w: 215.9, h: 279.4 },
+    { id: 'a5',     label: 'A5 (148 \u00D7 210 mm)',   w: 148,   h: 210 },
+    { id: 'note',   label: 'Note card (4 \u00D7 6 in)', w: 101.6, h: 152.4 },
   ];
 
   // lineSpacing (mm) is the paper's natural ruling; picking a paper applies it.
   HT.PAPERS = [
-    { id: 'notebook', label: 'Notebook — ruled with margin', lineSpacing: 8,    bg: '#fffef9' },
+    { id: 'notebook', label: 'Notebook \u2014 ruled with margin', lineSpacing: 8,    bg: '#fffef9' },
     { id: 'college',  label: 'College ruled',                 lineSpacing: 7.1,  bg: '#fffefb' },
     { id: 'legal',    label: 'Legal pad (yellow)',            lineSpacing: 8.7,  bg: '#fdf7c3' },
     { id: 'grid',     label: 'Grid (5 mm)',                   lineSpacing: 7.5,  bg: '#fdfdfb' },
@@ -80,11 +80,15 @@
     variation: 55,
     texture: 45,
     quality: 'high',     // export: 'standard' (150 dpi) | 'high' (300 dpi)
-    imageFormat: 'png',
+    imageFormat: 'jpg',  // JPG files are ~5x smaller than PNG with paper texture
+    header: { name: '', roll: '', subject: '', date: '' },
+    headerOn: 'first',   // 'off' | 'first' | 'all'
+    pageNumbers: false,
+    autoDownload: true,  // download the PDF straight after an upload
   };
 
   HT.PAGE_BREAK = '[pagebreak]';
-  HT.MAX_PAGES = 50;
+  HT.MAX_PAGES = 100;
 
   HT.SAMPLE_TEXT = [
     '# Unit 1: Introduction to Computer Networks',
@@ -92,13 +96,13 @@
     'A computer network is a group of computers connected together so they can share data and resources such as printers and internet access.',
     '',
     '## Types of networks',
-    '- LAN — Local Area Network (a home, lab or office)',
-    '- MAN — Metropolitan Area Network (a city)',
-    '- WAN — Wide Area Network (countries; the internet)',
+    '- LAN \u2014 Local Area Network (a home, lab or office)',
+    '- MAN \u2014 Metropolitan Area Network (a city)',
+    '- WAN \u2014 Wide Area Network (countries; the internet)',
     '',
     '## Why we use networks',
     '1. Sharing files and devices',
-    '2. Communication — email, chat, video calls',
+    '2. Communication \u2014 email, chat, video calls',
     '3. Centralised backups and security',
     '',
     'Try a different handwriting, paper or ink on the left, then download your pages as a PDF or images.',
