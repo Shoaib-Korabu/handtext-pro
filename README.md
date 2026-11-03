@@ -4,7 +4,7 @@ A free, open-source text-to-handwriting generator. **Upload your assignment** (P
 
 It's inspired by the feature set of tools like HandtextAI, but it's written from scratch with open-source fonts and libraries. Everything runs in your browser, so your text is never uploaded anywhere.
 
-**Current version: v0.6.0** · [Changelog](CHANGELOG.md)
+**Current version: v0.6.1** · [Changelog](CHANGELOG.md)
 
 🌐 **Live demo:** https://shoaib-korabu.github.io/handtext-pro/
 

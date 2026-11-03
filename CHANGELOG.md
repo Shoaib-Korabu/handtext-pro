@@ -2,6 +2,25 @@
 
 All notable changes to HandText Pro are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.6.1] — 2026-11-03
+
+### Changed
+- **Laptop and desktop layout:**
+  - The app fills the screen, with a compact fixed header.
+  - The settings column and the preview scroll separately.
+  - Page tabs, zoom, page count and the download buttons share one toolbar row.
+  - **Fit page** shows whole pages at any laptop size, side by side on wide screens. **Fit width** makes one page bigger.
+  - The settings column width adapts from 320 px up to 480 px.
+  - Print check puts its settings in a left column with the printed sheet beside them.
+- **Photo mode is crystal clear:** backgrounds are generated at full output resolution, with no upscaling or blur. The wood has real planks, seams, growth rings and fibres, there's a laminate table, a paper-edge highlight, and fine per-pixel sensor grain.
+
+### Added
+- **Spiral notebook (side coil)** photo scene, now the default:
+  - hard cover and a visible page stack
+  - punched holes and C-shaped metal coil loops with shading, highlights and contact shadows
+  - a tear-off perforation
+- The top-coil spiral notebook scene gets the same realistic coil and cover.
+
 ## [0.6.0] — 2026-11-03
 
 ### Added

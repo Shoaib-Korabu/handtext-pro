@@ -57,6 +57,7 @@
     if (!['fit', 'actual', '200'].includes(state.sim.zoom)) state.sim.zoom = sd.zoom;
     if (!['png', 'jpg', 'png-clear'].includes(state.imageFormat)) state.imageFormat = HT.DEFAULTS.imageFormat;
     if (!['print', 'photo'].includes(state.mode)) state.mode = HT.DEFAULTS.mode;
+    if (!['page', 'width'].includes(state.previewZoom)) state.previewZoom = 'page';
     if (!HT.Photo.SCENES.some((x) => x.id === state.scene)) state.scene = HT.DEFAULTS.scene;
     const clamp = (v, a, b, d) => (Number.isFinite(v) ? Math.min(b, Math.max(a, v)) : d);
     state.fontSize = clamp(state.fontSize, 12, 36, HT.DEFAULTS.fontSize);
@@ -200,17 +201,23 @@
   let previewK = 5;
   const nearScreen = new Set();
 
-  const io = 'IntersectionObserver' in window
-    ? new IntersectionObserver((entries) => {
+  // On laptops the preview pane scrolls by itself, so pages are watched inside it;
+  // on phones the whole page scrolls, so they're watched against the window.
+  let io = null;
+  let farIo = null;
+  function makeObservers() {
+    if (!('IntersectionObserver' in window)) return;
+    if (io) io.disconnect();
+    if (farIo) farIo.disconnect();
+    const root = isNarrow() ? null : $('preview');
+    io = new IntersectionObserver((entries) => {
       for (const e of entries) {
         const i = +e.target.dataset.index;
         if (e.isIntersecting) { nearScreen.add(i); drawPreviewPage(i); } else nearScreen.delete(i);
       }
-    }, { rootMargin: '1500px 0px' })
-    : null;
-  // Free the memory of pages far off screen when the document is long.
-  const farIo = 'IntersectionObserver' in window
-    ? new IntersectionObserver((entries) => {
+    }, { root, rootMargin: '1500px 0px' });
+    // Free the memory of pages far off screen when the document is long.
+    farIo = new IntersectionObserver((entries) => {
       if (!plan || plan.pages.length <= 12) return;
       for (const e of entries) {
         if (!e.isIntersecting) {
@@ -220,12 +227,24 @@
           e.target.classList.add('loading');
         }
       }
-    }, { rootMargin: '5000px 0px' })
-    : null;
+    }, { root, rootMargin: '5000px 0px' });
+    nearScreen.clear();
+    [...$('pages').children].forEach((div) => { io.observe(div); farIo.observe(div); });
+  }
+
+  /** Height a page gets in "Fit page" view on laptops (whole page visible). */
+  function updateFitHeight() {
+    const pane = $('preview');
+    const bar = $('previewBar');
+    const h = Math.max(320, pane.clientHeight - bar.offsetHeight - 52);
+    document.documentElement.style.setProperty('--fit-h', `${h}px`);
+    return h;
+  }
 
   function computePreviewK(p) {
     const wrap = $('pages');
-    const css = Math.min(760, wrap.clientWidth || Math.max(320, window.innerWidth - 40));
+    let css = Math.min(1000, wrap.clientWidth || Math.max(320, window.innerWidth - 40));
+    if (!isNarrow() && state.previewZoom === 'page') css = Math.min(css, updateFitHeight() * (p.outSize.w / p.outSize.h));
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     return Math.min(7, Math.max(2.5, (css * dpr) / p.outSize.w));
   }
@@ -242,13 +261,11 @@
       no.className = 'pno';
       div.append(c, no);
       wrap.appendChild(div);
-      if (io) io.observe(div);
-      if (farIo) farIo.observe(div);
+      if (io) { io.observe(div); farIo.observe(div); }
     }
     while (wrap.children.length > count) {
       const last = wrap.lastChild;
-      if (io) io.unobserve(last);
-      if (farIo) farIo.unobserve(last);
+      if (io) { io.unobserve(last); farIo.unobserve(last); }
       nearScreen.delete(+last.dataset.index);
       last.remove();
     }
@@ -889,6 +906,26 @@
       }
     });
 
+    // Preview zoom (laptops)
+    const setZoom = (z) => {
+      state.previewZoom = z;
+      $('pages').dataset.zoom = z;
+      $('zoomPage').setAttribute('aria-pressed', String(z === 'page'));
+      $('zoomWidth').setAttribute('aria-pressed', String(z === 'width'));
+      storage.save();
+      renderPreview();
+    };
+    $('zoomPage').addEventListener('click', () => setZoom('page'));
+    $('zoomWidth').addEventListener('click', () => setZoom('width'));
+    window.matchMedia('(max-width: 900px)').addEventListener('change', () => { makeObservers(); renderPreview(); });
+    if ('ResizeObserver' in window) {
+      let last = 0;
+      new ResizeObserver(() => {
+        const h = updateFitHeight();
+        if (Math.abs(h - last) > 40) { last = h; if (plan) { renderPreview(); scheduleSim(); } }
+      }).observe($('preview'));
+    }
+
     // Mobile tabs
     $('tabEdit').addEventListener('click', () => switchView('edit'));
     $('tabPreview').addEventListener('click', () => switchView('preview'));
@@ -1228,7 +1265,7 @@
       res.canvas.width = res.canvas.height = 1;
 
       const { sheet, placement: pl } = res;
-      if (zoom === 'fit') { sheetEl.style.width = `min(100%, calc((85vh - 56px) * ${sheet.w / sheet.h}))`; }
+      if (zoom === 'fit') { sheetEl.style.width = `min(100%, calc(var(--fit-h, 80vh) * ${sheet.w / sheet.h}))`; }
       else sheetEl.style.width = `${sheet.w * (zoom === '200' ? 2 : 1)}mm`;
       sheetEl.style.aspectRatio = `${sheet.w} / ${sheet.h}`;
       const area = $('simArea');
@@ -1392,6 +1429,11 @@
     bindSim();
     document.body.dataset.view = 'edit';
     document.body.dataset.mode = 'pages';
+    $('pages').dataset.zoom = state.previewZoom;
+    $('zoomPage').setAttribute('aria-pressed', String(state.previewZoom === 'page'));
+    $('zoomWidth').setAttribute('aria-pressed', String(state.previewZoom === 'width'));
+    makeObservers();
+    updateFitHeight();
     renderPreview();
   }
 

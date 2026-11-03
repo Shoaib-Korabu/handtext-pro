@@ -5,7 +5,7 @@
   'use strict';
   const HT = (root.HT = root.HT || {});
 
-  HT.VERSION = '0.6.0';
+  HT.VERSION = '0.6.1';
 
   // `cursive: true` = joined-up script; per-letter jitter is reduced so joins stay connected.
   HT.FONTS = [
@@ -73,7 +73,8 @@
     fontSize: 20,        // pt
     lineStep: 1,         // write on every 1st, 2nd or 3rd ruled line
     mode: 'print',       // 'print' (flat page) | 'photo' (page photographed in a scene)
-    scene: 'desk',       // Photo mode scene
+    previewZoom: 'page', // laptop/desktop preview: 'page' (whole pages) | 'width' (bigger)
+    scene: 'spiral-side', // Photo mode scene
     favFonts: '',        // starred handwritings, comma-separated ids
     lineSpacing: 8,      // mm
     wordSpacing: 100,    // % of normal
